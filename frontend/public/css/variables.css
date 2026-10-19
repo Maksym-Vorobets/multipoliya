@@ -1,0 +1,55 @@
+:root {
+  /* Space palette (sampled from design) */
+  --bg-deep: #060f19;
+  --bg: #0b1a2c;
+  --bg-2: #0e1d31;
+  --surface: #102135;
+  --surface-2: #132c3e;
+  --surface-3: #1c2d40;
+  --surface-glass: rgba(16, 33, 53, 0.72);
+  --line: rgba(225, 206, 156, 0.18);
+  --line-strong: rgba(225, 206, 156, 0.55);
+  --line-cool: rgba(120, 160, 200, 0.22);
+
+  /* Accents */
+  --gold: #ffd46d;
+  --gold-soft: #e1ce9c;
+  --gold-dim: #8a7047;
+  --sky: #4fb6e3;
+  --text: #f2f5fa;
+  --text-dim: #9fb0c3;
+  --text-mute: #6c7d91;
+  --danger: #ef5b6b;
+  --success: #4fd08a;
+
+  /* Player tokens */
+  --p-blue: #2fb5e8;
+  --p-violet: #a865e8;
+  --p-yellow: #f6c845;
+  --p-red: #ec4f63;
+
+  /* Economic models (board side strips) */
+  --m-kap: #e0613a;
+  --m-gos: #3a8fe0;
+  --m-nar: #36b45a;
+  --m-strip-yellow: #e7c13a;
+  --m-strip-violet: #9a5ad8;
+
+  /* Currencies */
+  --cur-usd: #ffd46d;
+  --cur-rub: #7fc7ff;
+  --cur-nar: #f0b35a;
+
+  /* Shape & motion */
+  --radius-s: 8px;
+  --radius: 12px;
+  --radius-l: 20px;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  --glow-gold: 0 0 0 1px var(--line-strong), 0 0 24px rgba(255, 212, 109, 0.12);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --t-fast: 160ms;
+  --t: 280ms;
+
+  --font: "Golos Text", "Segoe UI", Arial, sans-serif;
+  --header-h: 64px;
+}

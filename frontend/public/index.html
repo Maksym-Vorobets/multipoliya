@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1a2c" />
+  <meta name="description" content="Мультиполия — экономическая образовательная игра" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Мультиполия" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/variables.css" />
+  <link rel="stylesheet" href="/css/base.css" />
+  <link rel="stylesheet" href="/css/screens.css" />
+  <title>Мультиполия</title>
+  <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
+  <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
+</head>
+<body data-screen="start">
+  <noscript>Для игры включите JavaScript.</noscript>
+  <div class="stars" aria-hidden="true"></div>
+
+  <!-- Top bar -->
+  <header class="topbar" data-testid="topbar">
+    <button class="brand" data-go="start" data-testid="brand-home-link">
+      <span class="brand-mark" aria-hidden="true"><span></span></span>
+      <span class="brand-name">МУЛЬТИПОЛИЯ</span>
+    </button>
+
+    <nav class="topnav topnav--menu" data-testid="main-nav">
+      <button class="link" data-go="setup" data-i18n="nav.newGame" data-testid="nav-new-game">Новая игра</button>
+      <button class="link" data-open="rules" data-i18n="nav.rules" data-testid="nav-rules">Правила</button>
+      <button class="link" data-open="policy" data-i18n="nav.policy" data-testid="nav-policy">Политика</button>
+    </nav>
+
+    <nav class="topnav topnav--game" data-testid="game-nav">
+      <button class="btn btn--sm" id="btn-finish-game" data-i18n="game.finish" data-testid="game-finish-btn">Подвести итоги</button>
+      <button class="btn btn--sm" id="btn-bonus" data-i18n="game.bonus" data-testid="game-bonus-btn">Получить бонус</button>
+      <button class="btn btn--sm" id="btn-game-menu" data-i18n="game.menu" data-testid="game-menu-btn">Меню</button>
+    </nav>
+
+    <div class="lang" data-testid="lang-switcher">
+      <button class="lang-current" id="lang-current" aria-haspopup="listbox" data-testid="lang-current-btn">RU</button>
+      <ul class="lang-list" id="lang-list" role="listbox">
+        <li><button data-lang="ru" data-testid="lang-option-ru">RU · Русский</button></li>
+        <li><button data-lang="en" data-testid="lang-option-en">EN · English</button></li>
+        <li><button data-lang="uk" data-testid="lang-option-uk">UA · Українська</button></li>
+      </ul>
+    </div>
+
+    <button class="burger" id="burger" aria-label="menu" data-testid="mobile-menu-btn"><span></span><span></span><span></span></button>
+  </header>
+
+  <main class="screens">
+    <!-- ===== Start screen ===== -->
+    <section class="screen screen-start" id="screen-start" data-testid="screen-start">
+      <div class="start-card panel panel--gold reveal">
+        <p class="eyebrow" data-i18n="start.eyebrow">Экономическая образовательная игра</p>
+        <h1 class="start-title" data-testid="start-title"><span data-i18n="start.title1">МУЛЬТИ-</span><br /><span data-i18n="start.title2">ПОЛИЯ</span></h1>
+        <p class="start-lead" data-i18n="start.lead">Частный, государственный или народный капитализм? А может их комбинации? Решения принимаешь ты.</p>
+        <div class="stack">
+          <button class="btn btn--primary btn--lg" data-go="setup" data-i18n="start.newGame" data-testid="start-new-game-btn">Новая игра</button>
+          <button class="btn btn--ghost btn--lg" data-open="rules" data-i18n="start.rules" data-testid="start-rules-btn">Правила</button>
+        </div>
+      </div>
+      <div class="start-visual" aria-hidden="true">
+        <div class="orbit orbit--1"></div>
+        <div class="orbit orbit--2"></div>
+        <img class="bh" src="/assets/img/blackhole.png" alt="" />
+        <img class="planet planet--mars" src="/assets/img/mars.png" alt="" />
+        <img class="planet planet--moon" src="/assets/img/moon.png" alt="" />
+        <p class="start-note" data-i18n="start.note">Онлайн или против ботов · До 4 игроков</p>
+      </div>
+    </section>
+
+    <!-- ===== Setup screen ===== -->
+    <section class="screen screen-setup" id="screen-setup" data-testid="screen-setup">
+      <div class="setup-main">
+        <h1 class="h1" data-i18n="setup.title">Новая партия</h1>
+        <p class="sub" data-i18n="setup.sub">Выберите сценарий и состав игроков</p>
+        <div class="tabs" role="tablist">
+          <button class="tab is-active" data-mode="bots" data-i18n="setup.vsBots" data-testid="mode-bots-tab">Против ботов</button>
+          <button class="tab" data-mode="online" data-i18n="setup.online" data-testid="mode-online-tab">Онлайн-партия</button>
+        </div>
+        <div class="scenario-grid" id="scenario-grid" data-testid="scenario-grid"></div>
+        <div class="panel panel--gold selected-scenario" data-testid="selected-scenario">
+          <p class="eyebrow" data-i18n="setup.selected">Выбранный сценарий</p>
+          <h2 class="h2" id="sel-scn-name"></h2>
+          <p class="sub" id="sel-scn-desc"></p>
+        </div>
+      </div>
+
+      <aside class="panel panel--gold participants" data-testid="participants-panel">
+        <h2 class="h2 h2--lg" data-i18n="setup.participants">Участники</h2>
+        <p class="sub sub--xs" data-i18n="setup.upTo4">До четырёх игроков в партии</p>
+        <div class="stepper-row">
+          <span class="strong" data-i18n="setup.total">Всего участников</span>
+          <div class="stepper" data-stepper="total">
+            <button data-step="-1" data-testid="total-minus-btn">−</button>
+            <output id="val-total" data-testid="total-value">4</output>
+            <button data-step="1" data-testid="total-plus-btn">+</button>
+          </div>
+        </div>
+        <div class="stepper-row">
+          <span data-i18n="setup.real">Реальные игроки</span>
+          <div class="stepper" data-stepper="real">
+            <button data-step="-1" data-testid="real-minus-btn">−</button>
+            <output id="val-real" data-testid="real-value">1</output>
+            <button data-step="1" data-testid="real-plus-btn">+</button>
+          </div>
+        </div>
+        <hr class="sep" />
+        <div class="names-head">
+          <span class="strong" data-i18n="setup.names">Имена игроков</span>
+          <span class="strong" data-i18n="setup.botBehavior">Поведение ботов</span>
+        </div>
+        <div class="player-rows" id="player-rows" data-testid="player-rows"></div>
+        <button class="btn btn--primary btn--lg" id="btn-to-draw" data-i18n="setup.toDraw" data-testid="go-to-draw-btn">Перейти к жеребьёвке</button>
+      </aside>
+    </section>
+
+    <!-- ===== Draw (turn order) screen ===== -->
+    <section class="screen screen-draw" id="screen-draw" data-testid="screen-draw">
+      <div class="draw-wrap">
+        <h1 class="h1" data-i18n="draw.title">Жеребьёвка</h1>
+        <p class="sub" id="draw-sub" data-i18n="draw.sub">Определение порядка ходов</p>
+        <ul class="draw-list" id="draw-list" data-testid="draw-list"></ul>
+        <button class="btn btn--primary btn--lg" id="btn-draw" data-testid="draw-action-btn"></button>
+      </div>
+    </section>
+
+    <!-- ===== Game screen (shell; board generated in step 3) ===== -->
+    <section class="screen screen-game" id="screen-game" data-testid="screen-game">
+      <aside class="g-left" data-pane="players">
+        <div class="panel gold-price" data-testid="gold-price-panel">
+          <span class="eyebrow eyebrow--gold" data-i18n="game.goldPrice">Цена золота</span>
+          <span class="gold-value"><span data-i18n="game.gram">1 грамм</span> = <b id="gold-price" data-testid="gold-price-value">100</b> $</span>
+        </div>
+        <div class="panel turn-order">
+          <div class="panel-head">
+            <span class="eyebrow eyebrow--gold" data-i18n="game.turnOrder">Порядок ходов</span>
+            <span class="sky"><span data-i18n="game.turn">Ход</span> <b id="turn-no" data-testid="turn-number">1</b></span>
+          </div>
+          <ul class="players-list" id="players-list" data-testid="players-list"></ul>
+        </div>
+      </aside>
+
+      <div class="g-center" data-pane="board">
+        <div class="board" id="board" data-testid="game-board">
+          <div class="board-center" id="board-center">
+            <p class="eyebrow eyebrow--gold" data-i18n="game.currentSector">Текущий сектор</p>
+            <h2 class="center-title" id="center-title" data-testid="center-title"></h2>
+            <p class="sub" id="center-balance"></p>
+            <div class="dice" id="dice" data-testid="dice">
+              <div class="die" data-face="1"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="die" data-face="3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            </div>
+            <div class="actions" id="actions" data-testid="action-panel">
+              <button class="btn btn--primary" id="btn-roll" data-i18n="game.roll" data-testid="roll-dice-btn">Бросить кубики</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="g-right" data-pane="history">
+        <div class="panel sector-info" id="sector-info" data-testid="sector-info-panel">
+          <span class="eyebrow eyebrow--gold" data-i18n="game.currentSector">Текущий сектор</span>
+          <div class="sector-body" id="sector-body"></div>
+        </div>
+        <div class="panel history" data-testid="history-panel">
+          <span class="eyebrow eyebrow--gold" data-i18n="game.history">История событий</span>
+          <ul class="history-list" id="history-list" data-testid="history-list"></ul>
+          <button class="btn btn--sm btn--ghost" id="btn-all-history" data-i18n="game.allHistory" data-testid="all-history-btn">Вся история</button>
+        </div>
+      </aside>
+
+      <nav class="mobile-tabs" data-testid="mobile-tabs">
+        <button class="is-active" data-pane-btn="board" data-i18n="game.tabBoard" data-testid="tab-board">Поле</button>
+        <button data-pane-btn="players" data-i18n="game.tabPlayers" data-testid="tab-players">Игроки</button>
+        <button data-pane-btn="history" data-i18n="game.tabHistory" data-testid="tab-history">История</button>
+      </nav>
+    </section>
+  </main>
+
+  <!-- Modal root -->
+  <div class="modal" id="modal" aria-hidden="true" data-testid="modal">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-box panel panel--gold" role="dialog" aria-modal="true">
+      <button class="modal-x" data-close aria-label="close" data-testid="modal-close-btn">×</button>
+      <h3 class="modal-title" id="modal-title" data-testid="modal-title"></h3>
+      <div class="modal-body" id="modal-body" data-testid="modal-body"></div>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts" data-testid="toasts"></div>
+
+  <script src="/js/i18n.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

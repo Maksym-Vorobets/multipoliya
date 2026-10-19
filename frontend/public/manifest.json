@@ -1,0 +1,16 @@
+{
+  "name": "Мультиполия",
+  "short_name": "Мультиполия",
+  "description": "Экономическая образовательная игра: Капмония, Госмония, Нармония",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1a2c",
+  "theme_color": "#0b1a2c",
+  "lang": "ru",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
