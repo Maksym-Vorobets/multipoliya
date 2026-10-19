@@ -63,6 +63,15 @@
     "h.narTax": ["Налог Нармонии:", "Податок Нармонії:", "Narmonia tax:"], "h.narTaxBack": ["Возврат налога Нармонии:", "Повернення податку Нармонії:", "Narmonia tax refund:"],
     "h.gosNorm": ["Норма строительства не выполнена — Black Hole", "Норму будівництва не виконано — Black Hole", "Construction quota missed — Black Hole"],
     "h.writeOff": ["Списано всё доступное, статус «На пособии»:", "Списано все доступне, статус «На допомозі»:", "All funds taken, status: benefit:"],
+    "ad.title": ["Реклама", "Реклама", "Advertisement"], "ad.reward": ["Бонус", "Бонус", "Bonus"], "ad.watching": ["Идёт просмотр рекламы…", "Триває перегляд реклами…", "Ad is playing…"],
+    "ad.done": ["Просмотр завершён", "Перегляд завершено", "Ad finished"], "ad.claim": ["Получить бонус", "Отримати бонус", "Claim bonus"], "ad.cancel": ["Реклама не досмотрена — бонус не начислен", "Рекламу не додивилися — бонус не нараховано", "Ad not finished — no bonus"],
+    "ad.ok": ["Бонус начислен", "Бонус нараховано", "Bonus credited"], "ad.cur": ["Валюта", "Валюта", "Currency"], "ad.after": ["Баланс после начисления", "Баланс після нарахування", "Balance after"],
+    "ad.once": ["Бонус доступен один раз за круг ходов", "Бонус доступний один раз за коло ходів", "Bonus is available once per round"],
+    "h.adBonus": ["Бонус за просмотр рекламы:", "Бонус за перегляд реклами:", "Ad bonus:"], "h.finished": ["Партия завершена. Победитель: {names}", "Партію завершено. Переможець: {names}", "Match finished. Winner: {names}"],
+    "r.confirmTitle": ["Завершить партию?", "Завершити партію?", "Finish the match?"], "r.confirmSub": ["Система подсчитает «Строительство», «Уровень жизни» и «Капитал» и определит победителя.", "Система підрахує «Будівництво», «Рівень життя» і «Капітал» та визначить переможця.", "The system will score Construction, Living standard and Capital and pick the winner."],
+    "r.finish": ["Подвести итоги", "Підбити підсумки", "Show results"], "r.build": ["Строительство", "Будівництво", "Construction"], "r.life": ["Уровень жизни", "Рівень життя", "Living standard"],
+    "r.capital": ["Капитал", "Капітал", "Capital"], "r.place": ["место", "місце", "place"], "r.winner": ["Победитель", "Переможець", "Winner"], "r.draw": ["Ничья", "Нічия", "Draw"],
+    "r.title": ["Итоги партии", "Підсумки партії", "Match results"], "menu.home": ["Главный экран", "Головний екран", "Main screen"],
     "h.anomaly": ["Аномалия: {a} + {b} = {sum}", "Аномалія: {a} + {b} = {sum}", "Anomaly: {a} + {b} = {sum}"],
   });
 
@@ -345,18 +354,19 @@
     m.turnState.acted.post = true;
     const cur = E.fiatCur(m);
     const base = E.price(m, id);
-    let high = { p: null, amount: Math.round(base * 0.5) - 10 };
+    const step = E.SP.auctionStep;
+    let high = { p: null, amount: Math.round((base * E.SP.auctionStartPercent) / 100) - step };
     let left = m.players.filter((p) => p.status !== "bankrupt");
     for (let guard = 0; guard < 60 && left.length && !(left.length === 1 && high.p === left[0]); guard++) {
       const p = left[guard % left.length];
       if (p === high.p) continue;
-      const nextBid = high.amount + 10;
+      const nextBid = high.amount + step;
       let bid = null;
       if (p.isBot) bid = nextBid <= Math.min(botLimit(p, base), p.wallet.get(cur)) ? nextBid : null;
       else {
         bid = await dialog({
           title: `${t("g.auction")} · ${nm(id)}`, sub: `${t("g.bidder")}: ${p.name}`,
-          rows: [[t("g.start"), fmt(Math.round(base * 0.5), cur)], [t("g.highest"), high.p ? `${fmt(high.amount, cur)} (${esc(high.p.name)})` : "—"], [t("game.balance"), fmt(p.wallet.get(cur), cur)]],
+          rows: [[t("g.start"), fmt(Math.round((base * E.SP.auctionStartPercent) / 100), cur)], [t("g.highest"), high.p ? `${fmt(high.amount, cur)} (${esc(high.p.name)})` : "—"], [t("game.balance"), fmt(p.wallet.get(cur), cur)]],
           html: `<label class="dlg-input"><span>${t("g.amount")}</span><input type="number" id="bid-input" min="${nextBid}" step="10" value="${nextBid}" data-testid="auction-bid-input" /></label>`,
           buttons: [{ label: t("g.bid"), primary: true, testid: "auction-bid-btn", value: () => +$("#bid-input").value }, { label: t("g.pass"), value: null, testid: "auction-pass-btn" }],
           closable: false,
@@ -424,14 +434,115 @@
       const r = m.move(path[path.length - 1], { teleport: true });
       return handleFlow(r.flow, p);
     }
-    if (flow === "card" && !p.isBot) await dialog({ title: nm(p.cell), sub: t("g.card"), buttons: [{ label: t("common.ok"), value: true, primary: true }] });
+    if (flow === "card") return cardFlow(p, B.cells[p.cell].kind);
+  };
+
+  const cardFlow = async (p, kind) => {
+    const d = window.MPCards.draw(m, p.cell, kind);
+    const sum = window.MPCards.summary(m, d);
+    m.log({ key: "h.card", playerId: p.id, params: { deck: `@c.${kind}`, n: d.n, text: sum } });
+    const html = `<div class="mp-card mp-card--${kind}" data-testid="card-view"><span class="mp-card-kind">${kind.toUpperCase()} · ${E.L("m_" + d.model)}</span>
+      ${lang() === "ru" ? `<p class="mp-card-text" data-testid="card-text">${esc(d.card.t)}</p>` : ""}<p class="mp-card-effect" data-testid="card-effect">${esc(sum)}</p></div>`;
+    const title = `${t("c." + kind)} №${d.n}`;
+    let choice = null;
+    if (d.card.e[0] === "choice") {
+      choice = p.isBot ? (p.wallet.get(E.fiatCur(m)) > 100 ? "fine" : "chance")
+        : await dialog({ title, html, buttons: [{ label: t("c.payFine"), value: "fine", primary: true, testid: "card-fine-btn" }, { label: t("c.drawChance"), value: "chance", testid: "card-chance-btn" }], closable: false });
+    } else if (!p.isBot) await dialog({ title, html, buttons: [{ label: t("c.apply"), value: true, primary: true, testid: "card-apply-btn" }], closable: false });
+    const r = window.MPCards.apply(m, p, d, choice) || {};
+    m.changed();
+    if (r.chance) return cardFlow(p, "chance");
+    if (r.path && r.path.length) {
+      await animatePath(p, r.path);
+      const res = m.move(r.path[r.path.length - 1], { teleport: true });
+      return handleFlow(res.flow, p);
+    }
+  };
+
+  /* ================= Ad bonus (MOCK ad view) ================= */
+  const adBonus = async () => {
+    const p = m.current.isBot ? m.players.find((x) => !x.isBot) : m.current;
+    if (!p) return;
+    m.flags.ads = m.flags.ads || {};
+    if (m.flags.ads[p.id] === m.roundNo) return window.MPApp.toast(t("ad.once"), "error");
+    const cur = m.scenario === "nar_nar" ? "nar" : E.fiatCur(m);
+    const amount = cur === "nar" ? E.SP.adBonus.nar : m.bank.fiat(E.SP.adBonus[cur]);
+    setTimeout(() => {
+      const bar = $("#ad-bar");
+      if (bar) bar.style.width = "100%";
+    }, 50);
+    const timer = setTimeout(() => {
+      const b = $('[data-testid="ad-claim-btn"]');
+      if (b) b.disabled = false;
+      const st = $("#ad-state");
+      if (st) st.textContent = t("ad.done");
+    }, 5000);
+    const ok = await dialog({
+      title: t("ad.title"), sub: `${p.name} · ${t("ad.reward")}: ${fmt(amount, cur)}`,
+      html: `<div class="ad-box" data-testid="ad-player"><span class="ad-tag">AD · MOCK</span><p id="ad-state">${t("ad.watching")}</p><div class="ad-track"><i id="ad-bar"></i></div></div>`,
+      buttons: [{ label: t("ad.claim"), value: true, primary: true, disabled: true, testid: "ad-claim-btn" }, { label: t("g.back"), value: null, testid: "ad-cancel-btn" }],
+    });
+    clearTimeout(timer);
+    if (!ok) return window.MPApp.toast(t("ad.cancel"), "error");
+    m.flags.ads[p.id] = m.roundNo;
+    m.credit(p, cur, amount, "h.adBonus");
+    m.changed();
+    await dialog({ title: t("ad.ok"), rows: [[t("g.amount"), fmt(amount, cur)], [t("ad.cur"), t("cur." + cur)], [t("ad.after"), fmt(p.wallet.get(cur), cur)]], buttons: [{ label: t("common.close"), value: true, primary: true, testid: "ad-close-btn" }] });
+  };
+
+  /* ================= Results ================= */
+  const computeResults = () => {
+    const unit = m.scenario === "nar_nar" ? "usd" : E.fiatCur(m);
+    const rows = m.players.map((p) => {
+      const cash = p.wallet.usd + p.wallet.rub + p.wallet.nar * m.bank.goldPrice;
+      const props = Object.entries(m.cells).reduce((a, [id, s]) => a + (s.owners[p.id] ? E.propValue(m, id, s) * s.owners[p.id] * (s.mortgaged ? 0.5 : 1) : 0), 0);
+      const debt = p.loans.reduce((a, l) => a + l.debt, 0);
+      return { p, build: Math.round(p.stats.build), life: Math.round(p.stats.life), capital: Math.round(cash + props - debt), points: 0, places: {} };
+    });
+    const PTS = [4, 2, 1, 0];
+    ["build", "life", "capital"].forEach((k) => {
+      const sorted = [...rows].sort((a, b) => b[k] - a[k]);
+      sorted.forEach((r) => {
+        const place = sorted.findIndex((x) => x[k] === r[k]);
+        r.places[k] = place + 1;
+        r.points += PTS[place] || 0;
+      });
+    });
+    const max = Math.max(...rows.map((r) => r.points));
+    rows.forEach((r) => (r.winner = r.points === max));
+    return { unit, rows: rows.sort((a, b) => b.points - a.points), draw: rows.filter((r) => r.winner).length > 1 };
+  };
+  const finishGame = async () => {
+    const ok = await dialog({ title: t("r.confirmTitle"), sub: t("r.confirmSub"), buttons: [{ label: t("r.finish"), value: true, primary: true, testid: "confirm-finish-btn" }, { label: t("g.back"), value: null }] });
+    if (!ok) return;
+    const res = computeResults();
+    m.log({ key: "h.finished", params: { names: res.rows.filter((r) => r.winner).map((r) => r.p.name).join(", ") } });
+    m.phase = "finished";
+    m.save();
+    window.MPState.Match.clear();
+    const cat = (r, k) => `<div class="res-metric"><span>${t("r." + k)}</span><b>${fmt(r[k], res.unit)}</b><em>${r.places[k]} ${t("r.place")} · +${[4, 2, 1, 0][r.places[k] - 1] || 0}</em></div>`;
+    $("#results-body").innerHTML = `<p class="sub" data-testid="results-verdict">${res.draw ? t("r.draw") : t("r.winner")}: <b class="gold">${esc(res.rows.filter((r) => r.winner).map((r) => r.p.name).join(", "))}</b></p>
+      <div class="res-grid">${res.rows.map((r, i) => `<article class="panel res-card${r.winner ? " is-winner" : ""}" data-testid="result-card-${r.p.color}" style="animation-delay:${i * 90}ms">
+        <header><img src="/assets/img/token-${r.p.color}.png" alt="" /><div><h3>${esc(r.p.name)}</h3>${r.winner ? `<span class="res-badge">${res.draw ? t("r.draw") : t("r.winner")}</span>` : ""}</div>
+        <strong data-testid="result-points-${r.p.color}">${r.points}<small>/12</small></strong></header>${cat(r, "build")}${cat(r, "life")}${cat(r, "capital")}</article>`).join("")}</div>`;
+    window.MPApp.go("results");
+  };
+  const gameMenu = async () => {
+    const v = await dialog({ title: t("game.menu"), buttons: [
+      { label: t("game.finish"), value: "finish", testid: "menu-finish-btn" }, { label: t("game.bonus"), value: "bonus", testid: "menu-bonus-btn" },
+      { label: t("nav.rules"), value: "rules", testid: "menu-rules-btn" }, { label: t("menu.home"), value: "home", testid: "menu-home-btn" },
+      { label: t("g.back"), value: null, primary: true, testid: "menu-back-btn" }] });
+    if (v === "finish") return finishGame();
+    if (v === "bonus") return adBonus();
+    if (v === "rules") return dialog({ title: t("rules.title"), html: `<div class="modal-body">${t("rules.body")}</div>`, buttons: [{ label: t("common.ok"), value: true }] });
+    if (v === "home") window.MPApp.go("start");
   };
 
   const startTurnChecks = async () => {
     const p = m.current;
     if (!p.restrictions.blackhole || m.phase !== "await_roll") return true;
     const nar = m.scenario === "nar_nar";
-    const opt = nar ? { cur: "nar", amount: 0.5 } : { cur: E.fiatCur(m), amount: m.bank.fiat(50) };
+    const opt = nar ? { cur: "nar", amount: E.SP.blackHoleFineNar } : { cur: E.fiatCur(m), amount: m.bank.fiat(E.SP.blackHoleFine) };
     const can = p.wallet.has(opt.cur, opt.amount);
     const choice = p.isBot ? (can ? "pay" : "skip") : await dialog({ title: "Black Hole", sub: t("g.bh"), buttons: [{ label: `${t("g.payFine")} · ${fmt(opt.amount, opt.cur)}`, value: "pay", disabled: !can, primary: true, testid: "bh-pay-btn" }, { label: t("g.skip"), value: "skip", testid: "bh-skip-btn" }], closable: false });
     p.restrictions.blackhole = false;
@@ -605,6 +716,9 @@
     if (g && g.dataset.g === "confirm" && selected) return confirmMove(selected);
     if (g && g.dataset.g === "cell") return openCell();
     if (e.target.closest("#btn-roll")) return roll();
+    if (e.target.closest("#btn-finish-game")) return busy || dlgResolve ? null : finishGame();
+    if (e.target.closest("#btn-bonus")) return dlgResolve ? null : adBonus();
+    if (e.target.closest("#btn-game-menu")) return dlgResolve ? null : gameMenu();
     if (e.target.closest("#btn-end-turn")) return endTurn();
     const pr = e.target.closest("[data-prop]");
     if (pr) {

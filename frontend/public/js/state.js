@@ -82,8 +82,8 @@
     // Fiat prices follow priceIndex; Narmonit amounts stay unchanged
     fiat(amount) { return Math.round(amount * this.priceIndex); }
     usdToNar(usd) { return round2(usd / this.goldPrice); }
-    applyIndex(pct) {
-      this.priceIndex = round2(this.priceIndex * (1 + pct / 100));
+    applyIndex(factor) {
+      this.priceIndex = round2(this.priceIndex * factor);
       this.goldPrice = round2(100 * this.priceIndex);
     }
     toJSON() { return { goldPrice: this.goldPrice, priceIndex: this.priceIndex, gosFund: this.gosFund }; }
@@ -105,7 +105,9 @@
       this.turnState = d.turnState || Match.freshTurn();
       this.bank = new Bank(d.bank);
       this.history = new HistoryLog(d.history);
-      this.cells = d.cells || {}; // cellId -> ownership/build state (step 4)
+      this.cells = d.cells || {}; // cellId -> ownership/build state
+      this.flags = d.flags || {}; // subbotnik, ad bonus rounds, etc.
+      this.decks = d.decks || {}; // shuffled Chance/Borgi decks
     }
 
     static create({ scenario, currencies, players }) {
@@ -232,8 +234,8 @@
 
     /* ----- persistence ----- */
     toJSON() {
-      const { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells, moveOptions, turnState } = this;
-      return { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells, moveOptions, turnState };
+      const { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells, moveOptions, turnState, flags, decks } = this;
+      return { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells, moveOptions, turnState, flags, decks };
     }
     save() { localStorage.setItem(SAVE_KEY, JSON.stringify(this)); }
     static load() {

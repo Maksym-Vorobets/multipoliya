@@ -27,17 +27,18 @@
   };
 
   /* ----- model & currency ----- */
-  const model = (m, id) => {
+  const model = (m, id) => (["planet", "station"].includes(B.cells[id].kind) ? zone(m, id) : null);
+  // Economic model of the board zone (also used for Chance/Borgi decks)
+  const zone = (m, id) => {
     const c = B.cells[id];
-    if (!["planet", "station"].includes(c.kind)) return null;
     const s = m.scenario;
     if (s === "kap_kap") return "kap";
     if (s === "nar_nar") return "nar";
     if (s === "gos_gos") return "gos";
-    if (s === "kap_nar") return c.ring === 1 ? "kap" : "nar";
+    if (s === "kap_nar") return (c.ring || 1) === 1 ? "kap" : "nar";
     const st = m.cells[id];
     if (st && st.type === "state") return "gos";
-    return c.ring === 1 && c.pos < 20 ? "kap" : "gos"; // kap_gos: first half of ring 1 is Kapmonia
+    return (c.ring || 1) === 1 && c.pos < 20 ? "kap" : "gos"; // kap_gos: first half of ring 1 is Kapmonia
   };
   const fiatCur = (m) => (["gos_gos", "kap_gos"].includes(m.scenario) ? "rub" : "usd");
 
@@ -55,7 +56,8 @@
     return m.cells[id];
   };
   const price = (m, id) => m.bank.fiat(B.cells[id].price);
-  const buildCost = (m, id, kind) => m.bank.fiat(kind === "dome" ? B.cells[id].build * 0.8 : B.cells[id].build);
+  const SP = window.MPPrices.special;
+  const buildCost = (m, id, kind) => m.bank.fiat(kind === "dome" ? B.cells[id].dome : B.cells[id].build);
   const level = (s) => (s.dome ? 5 : s.modules);
   const soleOwner = (s) => {
     const ids = Object.keys(s.owners);
@@ -68,7 +70,7 @@
     if (c.kind === "station") {
       const owner = soleOwner(s);
       const count = owner ? Object.keys(m.cells).filter((k) => B.cells[k].kind === "station" && soleOwner(m.cells[k]) === owner).length : 1;
-      return m.bank.fiat(25 * Math.pow(2, Math.max(0, count - 1)) * (c.ring === 2 ? 1.2 : 1));
+      return m.bank.fiat(c.rent[Math.min(3, Math.max(0, count - 1))]);
     }
     const t = B.rentTable(c);
     const L_ = lvl ?? level(s);
@@ -235,7 +237,7 @@
         const mdl = model(m, id);
         const cost = buildCost(m, id, a.id);
         if (mdl === "gos") {
-          const payout = Math.round(cost * 0.25);
+          const payout = Math.round((cost * SP.gosPayoutPercent) / 100);
           m.bank.gosFund -= payout;
           m.credit(p, fiatCur(m), payout, "h.gosPayout", { cell: name });
           p.stats.build += payout;
@@ -250,7 +252,7 @@
         return { ok: true };
       }
       case "gosBuild": {
-        const payout = Math.round(price(m, id) * 0.25);
+        const payout = Math.round((price(m, id) * SP.gosPayoutPercent) / 100);
         s.built = true;
         s.type = "state";
         m.bank.gosFund -= payout;
@@ -362,18 +364,18 @@
     const cur = fiatCur(m);
     const name = "#" + id;
     if (s.mortgaged) {
-      const cost = Math.round(price(m, id) * 0.55);
+      const cost = Math.round((price(m, id) * SP.redeemPercent) / 100);
       if (!m.debit(p, cur, cost, "h.unmortgage", { cell: name })) return false;
       s.mortgaged = false;
     } else {
       s.mortgaged = true;
-      m.credit(p, cur, Math.round(price(m, id) * 0.5), "h.mortgage", { cell: name });
+      m.credit(p, cur, Math.round((price(m, id) * SP.mortgagePercent) / 100), "h.mortgage", { cell: name });
     }
     return true;
   };
   const sellToBank = (m, p, id) => {
     const s = st(m, id);
-    const amount = Math.round(propValue(m, id, s) * (s.mortgaged ? 0.25 : 0.75));
+    const amount = Math.round((propValue(m, id, s) * (SP.sellToBankPercent - (s.mortgaged ? SP.mortgagePercent : 0))) / 100);
     m.credit(p, fiatCur(m), amount, "h.sell", { cell: "#" + id });
     if (m.scenario === "kap_nar") {
       const active = m.players.filter((pl) => pl.status !== "bankrupt");
@@ -409,11 +411,16 @@
     if (mdl === "nar" && Object.keys(s.owners).length && soleOwner(s) !== p.id) t.due = { id };
     if (c.kind === "tax") {
       const cur = nar ? "nar" : fiatCur(m);
-      const amount = nar ? Math.min(0.5, p.wallet.nar) : Math.round(p.wallet.get(cur) * 0.1);
+      const amount = nar ? Math.min(SP.kvantalNar, p.wallet.nar) : Math.round((p.wallet.get(cur) * SP.kvantalPercent) / 100);
       if (amount > 0) m.debit(p, cur, amount, "h.tax", { cell: "#" + id });
     }
-    if (c.kind === "grant") m.credit(p, nar ? "nar" : fiatCur(m), nar ? 0.5 : m.bank.fiat(50), "h.grant", { cell: "#" + id });
-    if (id === "c20" && ["kap_nar", "nar_nar"].includes(m.scenario)) m.credit(p, "nar", 1, "h.narmonyon");
+    if (c.kind === "grant") m.credit(p, nar ? "nar" : fiatCur(m), nar ? SP.iciteGrantNar : m.bank.fiat(SP.iciteGrant), "h.grant", { cell: "#" + id });
+    if (id === "c20" && ["kap_nar", "nar_nar"].includes(m.scenario)) m.credit(p, "nar", SP.narmonyonNar, "h.narmonyon");
+    if (id === "c10" && p.restrictions.patch > 0) {
+      p.restrictions.patch -= 1;
+      m.log({ key: "h.patchUsed", playerId: p.id });
+      return null;
+    }
     if (id === "c10") {
       p.restrictions.blackhole = true;
       m.log({ key: "h.blackhole", playerId: p.id });
@@ -439,7 +446,7 @@
 
   const onRound = (m, roundNo) => {
     const active = m.players.filter((pl) => pl.status !== "bankrupt");
-    if (m.scenario === "gos_gos") active.forEach((pl) => m.credit(pl, "rub", 50, "h.gosIncome"));
+    if (m.scenario === "gos_gos") active.forEach((pl) => m.credit(pl, "rub", m.flags.subbotnik ? 25 : 50, "h.gosIncome"));
     // Narmonia: rent fund returned to owners by shares every round
     Object.entries(m.cells).forEach(([id, s]) => {
       Object.entries(s.fund || {}).forEach(([cur, sum]) => {
@@ -494,7 +501,7 @@
   };
 
   window.MPEco = {
-    L, model, fiatCur, payOpts, canPayAny, st, price, buildCost, rentFor, tariffs, level, soleOwner, propValue, kapPropertyValue,
+    L, model, zone, fiatCur, SP, fiatOf, payOpts, canPayAny, st, price, buildCost, rentFor, tariffs, level, soleOwner, propValue, kapPropertyValue,
     ownedCells, actions, perform, auctionWin, jointBuy, publicBuild, mortgage, sellToBank, loanLimit, takeLoan, repayLoans,
     onLand, onRound, everyTurnStart, statusLabel, refreshBenefit,
   };

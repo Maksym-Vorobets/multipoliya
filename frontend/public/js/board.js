@@ -40,13 +40,9 @@
     ["sky", ["rhea", "enceladus", "titan"], "#3fb7e8"], ["blue", ["umbriel", "oberon", "titania"], "#3a6fe0"],
     ["violet", ["nereid", "proteus", "triton"], "#9a5ad8"], ["pink", ["haumea", "makemake", "eris"], "#d9579e"],
   ];
-  // Base prices ($ on ring 1; ring 2 = ×1.2) and module cost per group. Configurable price list.
-  const GROUP_PRICE = [60, 100, 140, 180, 220, 260, 300, 350];
-  const GROUP_BUILD = [50, 50, 100, 100, 150, 150, 200, 200];
+  // All prices/rents come from js/prices.js (window.MPPrices.cells)
   const STATIONS = ["orion", "pegasus", "kiola", "vega"];
-  const RING_MULT = { 1: 1, 2: 1.2 };
-  const RENT_MULT = [1, 3.5, 11.5, 27.5, 35]; // by modules 0..4; dome = 40
-  const DOME_MULT = 40;
+  const PRICE = window.MPPrices.cells;
   const CORNERS = { 0: "c0", 10: "c10", 20: "c20", 30: "c30" };
   const CORNER_IMG = { c0: "obj-cosmoport", c10: "blackhole", c20: "obj-narmonyon", c30: "obj-anomaly" };
 
@@ -77,13 +73,11 @@
       else if (token === "kvantal") kind = "tax";
       else if (token === "icite") kind = "grant";
       const c = { id, pos, ring, kind, key, label: token.replace("_", " ").toUpperCase() };
-      if (kind === "planet") {
-        const gi = groupOf[key];
-        c.group = gi;
-        c.price = Math.round(GROUP_PRICE[gi] * RING_MULT[ring]);
-        c.build = Math.round(GROUP_BUILD[gi] * RING_MULT[ring]);
+      if (kind === "planet" || kind === "station") {
+        const row = PRICE[`${key}-1${ring}`];
+        Object.assign(c, { price: row.price, build: row.module, dome: row.dome, rent: row.rent });
+        if (kind === "planet") c.group = groupOf[key];
       }
-      if (kind === "station") c.price = Math.round(200 * RING_MULT[ring]);
       cells[id] = c;
       return id;
     });
@@ -139,10 +133,7 @@
     const a = ART[c.key];
     return a ? { img: a[0], hue: a[1] } : null;
   };
-  const rentTable = (c) => {
-    const base = Math.round(c.price * 0.1);
-    return { base, double: base * 2, modules: RENT_MULT.map((m) => Math.round(base * m)), dome: base * DOME_MULT };
-  };
+  const rentTable = (c) => ({ base: c.rent[0], double: c.rent[0] * 2, modules: c.rent.slice(0, 5), dome: c.rent[5] });
 
-  window.MPBoard = { cells, order, GROUPS, CORNERS, next, reachable, forwardTo, groupCells, name, art, rentTable, STATIONS };
+  window.MPBoard = { cells, groupOf, order, GROUPS, CORNERS, next, reachable, forwardTo, groupCells, name, art, rentTable, STATIONS };
 })();

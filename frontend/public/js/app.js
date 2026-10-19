@@ -282,7 +282,6 @@
       $$(".mobile-tabs button").forEach((b) => b.classList.toggle("is-active", b === el));
       return;
     }
-    if (["btn-finish-game", "btn-bonus", "btn-game-menu"].includes(el.id)) return toast(t("game.notYet"));
   });
 
   document.addEventListener("input", (e) => {
@@ -310,6 +309,6 @@
   window.I18N.apply();
   document.dispatchEvent(new CustomEvent("langchange", { detail: window.I18N.lang }));
   go("start");
-  window.MPApp = { toast, renderGame };
+  window.MPApp = { toast, renderGame, go };
   window.MP = { ui, go }; // debug hook
 })();
