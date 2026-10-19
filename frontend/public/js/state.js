@@ -36,7 +36,10 @@
       this.color = d.color;
       this.isBot = !!d.isBot;
       this.botType = d.botType || null;
-      this.cell = d.cell || "cosmoport";
+      this.cell = d.cell && window.MPBoard.cells[d.cell] ? d.cell : "c0";
+      this.stats = d.stats || { build: 0, life: 0, builds: 0 };
+      this.turnsTaken = d.turnsTaken || 0;
+      this.rentIncome = d.rentIncome || 0;
       this.ring = d.ring || 1;
       this.moves = d.moves || [];
       this.status = d.status || "active"; // active | benefit | bankrupt
@@ -53,8 +56,8 @@
       this.moves = [...this.moves, { cell, ring }].slice(-10);
     }
     toJSON() {
-      const { id, idx, name, color, isBot, botType, cell, ring, moves, status, doubles, restrictions, loans, props, wallet } = this;
-      return { id, idx, name, color, isBot, botType, cell, ring, moves, status, doubles, restrictions, loans, props, wallet };
+      const { id, idx, name, color, isBot, botType, cell, ring, moves, status, doubles, restrictions, loans, props, wallet, stats, turnsTaken, rentIncome } = this;
+      return { id, idx, name, color, isBot, botType, cell, ring, moves, status, doubles, restrictions, loans, props, wallet, stats, turnsTaken, rentIncome };
     }
   }
 
@@ -96,8 +99,10 @@
       this.active = d.active || 0;
       this.turnNo = d.turnNo || 1;
       this.roundNo = d.roundNo || 1;
-      this.phase = d.phase || "await_roll"; // await_roll | await_end | finished
+      this.phase = d.phase || "await_roll"; // await_roll | await_move | await_end | finished
       this.lastRoll = d.lastRoll || null;
+      this.moveOptions = d.moveOptions || null;
+      this.turnState = d.turnState || Match.freshTurn();
       this.bank = new Bank(d.bank);
       this.history = new HistoryLog(d.history);
       this.cells = d.cells || {}; // cellId -> ownership/build state (step 4)
@@ -115,6 +120,8 @@
       m.save();
       return m;
     }
+
+    static freshTurn() { return { stage: "pre", acted: { pre: false, post: false }, bought: [], improved: [], due: null, declined: null }; }
 
     get rules() { return SCENARIO_RULES[this.scenario]; }
     get current() { return this.players[this.active]; }
@@ -158,31 +165,54 @@
       this.log({ key: double ? "h.rollDouble" : "h.roll", playerId: p.id, params: { a, b, sum: a + b } });
       if (p.doubles >= 3) {
         p.doubles = 0;
-        p.recordMove("blackhole", p.ring);
+        p.recordMove("c10", p.ring);
+        p.restrictions.blackhole = true;
         this.lastRoll.toBlackHole = true;
         this.log({ key: "h.threeDoubles", playerId: p.id });
+        this.phase = "await_end";
+      } else {
+        this.moveOptions = window.MPBoard.reachable(p.cell, a + b);
+        this.phase = "await_move";
       }
-      this.phase = "await_end"; // step 3 inserts await_move (cell choice)
       this.changed();
       return this.lastRoll;
     }
 
-    endTurn() {
-      if (this.phase !== "await_end") return;
+    // Confirm destination; returns special flow (anomaly/card/blackhole) for the controller
+    move(cellId, { teleport } = {}) {
       const p = this.current;
-      const extra = this.lastRoll && this.lastRoll.double && !this.lastRoll.toBlackHole;
+      if (!teleport && (this.phase !== "await_move" || !this.moveOptions.some((o) => o.id === cellId))) return { error: "unavailable" };
+      const from = p.cell;
+      p.recordMove(cellId, window.MPBoard.cells[cellId].ring || p.ring);
+      this.moveOptions = null;
+      this.phase = "await_end";
+      this.turnState.stage = "post";
+      this.log({ key: "h.move", playerId: p.id, params: { from: "#" + from, to: "#" + cellId } });
+      const flow = window.MPEco.onLand(this, p, cellId);
+      this.changed();
+      return { flow };
+    }
+
+    endTurn() {
+      if (this.phase !== "await_end" || this.turnState.due) return false;
+      const p = this.current;
+      const extra = this.lastRoll && this.lastRoll.double && !this.lastRoll.toBlackHole && !p.restrictions.blackhole;
       this.turnNo += 1;
       this.lastRoll = null;
       this.phase = "await_roll";
+      this.turnState = Match.freshTurn();
       if (extra) {
         this.log({ key: "h.extraTurn", playerId: p.id });
-        return this.changed();
+        this.changed();
+        return true;
       }
       p.doubles = 0;
       this.log({ key: "h.endTurn", playerId: p.id });
       this.active = (this.active + 1) % this.players.length;
       if (this.active === 0) this.completeRound();
+      window.MPEco.everyTurnStart(this, this.current);
       this.changed();
+      return true;
     }
 
     // Periodic calculations after every full round of turns
@@ -196,13 +226,14 @@
         }
         if (ubi) this.credit(p, "nar", ubi, "h.ubi");
       });
+      window.MPEco.onRound(this, this.roundNo);
       this.roundNo += 1;
     }
 
     /* ----- persistence ----- */
     toJSON() {
-      const { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells } = this;
-      return { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells };
+      const { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells, moveOptions, turnState } = this;
+      return { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells, moveOptions, turnState };
     }
     save() { localStorage.setItem(SAVE_KEY, JSON.stringify(this)); }
     static load() {

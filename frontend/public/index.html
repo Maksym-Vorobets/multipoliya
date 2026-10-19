@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="/css/variables.css" />
   <link rel="stylesheet" href="/css/base.css" />
   <link rel="stylesheet" href="/css/screens.css" />
+  <link rel="stylesheet" href="/css/board.css" />
   <title>Мультиполия</title>
   <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
   <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
@@ -172,6 +173,7 @@
           <span class="eyebrow eyebrow--gold" data-i18n="game.currentSector">Текущий сектор</span>
           <div class="sector-body" id="sector-body"></div>
         </div>
+        <div class="panel props" id="props-panel" data-testid="player-props-panel"></div>
         <div class="panel history" data-testid="history-panel">
           <span class="eyebrow eyebrow--gold" data-i18n="game.history">История событий</span>
           <ul class="history-list" id="history-list" data-testid="history-list"></ul>
@@ -200,7 +202,10 @@
   <div class="toasts" id="toasts" data-testid="toasts"></div>
 
   <script src="/js/i18n.js"></script>
+  <script src="/js/board.js"></script>
   <script src="/js/state.js"></script>
+  <script src="/js/economy.js"></script>
+  <script src="/js/game.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

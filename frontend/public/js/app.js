@@ -64,7 +64,7 @@
     if (name === "setup") renderSetup();
     if (name === "draw") renderDraw();
     if (name === "game") renderGame();
-    if (name === "game") scheduleBot();
+    if (name === "game") window.MPGame.scheduleBot();
     window.scrollTo({ top: 0 });
   };
 
@@ -162,14 +162,16 @@
 
   /* ---------- match (state lives in MPState.Match) ---------- */
   const { Match } = window.MPState;
-  const CELL_INFO = { cosmoport: ["Istok Cosmoport", "obj-cosmoport"], blackhole: ["Black Hole", "blackhole"] }; // full board in step 3
   const balances = (p, sep = " · ") => ui.match.currencies.map((c) => fmt(p.wallet.get(c), c)).join(sep);
   const moneyText = (list) => list.map(({ cur, amount }) => `${amount > 0 ? "+" : "−"}${fmt(Math.abs(amount), cur)}`).join(" · ");
 
   const histText = (e) => {
     const params = { ...e.params };
     Object.keys(params).forEach((k) => {
-      if (typeof params[k] === "string" && params[k].startsWith("@")) params[k] = t(params[k].slice(1));
+      const v = params[k];
+      if (typeof v !== "string") return;
+      if (v.startsWith("@")) params[k] = t(v.slice(1));
+      if (v.startsWith("#") && window.MPBoard.cells[v.slice(1)]) params[k] = window.MPBoard.name(v.slice(1), window.I18N.lang);
     });
     return t(e.key, params) + (e.money ? ` ${moneyText(e.money)}` : "");
   };
@@ -180,9 +182,11 @@
 
   const attach = (m) => {
     ui.match = m;
+    window.MPGame.attach(m);
     m.addEventListener("change", () => {
+      if (ui.match !== m) return;
       if (ui.screen === "game") renderGame();
-      scheduleBot();
+      window.MPGame.scheduleBot();
     });
   };
 
@@ -206,21 +210,10 @@
     go("game");
   };
 
-  const renderActions = () => {
-    const m = ui.match;
-    const p = m.current;
-    let html;
-    if (p.isBot) html = `<button class="btn" disabled data-testid="bot-turn-indicator">${t("game.botThinking")}</button>`;
-    else if (m.phase === "await_roll") html = `<button class="btn btn--primary" id="btn-roll" data-testid="roll-dice-btn">${t("game.roll")}</button>`;
-    else html = `<button class="btn btn--primary" id="btn-end-turn" data-testid="end-turn-btn">${t("game.endTurn")}</button>`;
-    $("#actions").innerHTML = html;
-  };
-
   const renderGame = () => {
     const m = ui.match;
     if (!m) return go("start");
     const cur = m.current;
-    const [cellName, cellImg] = CELL_INFO[cur.cell] || [cur.cell, "obj-cosmoport"];
     $("#turn-no").textContent = m.turnNo;
     $("#gold-price").textContent = m.bank.goldPrice.toLocaleString("ru-RU");
     $("#players-list").innerHTML = m.players.map((p, i) => `
@@ -232,47 +225,14 @@
           ${p.status === "benefit" ? `<div class="pl-status" data-testid="player-status-${p.color}">${t("game.onBenefit")}</div>` : ""}</div>
         ${i === m.active ? `<span class="pl-tag">${t("game.yourTurn")}</span>` : "<span></span>"}
       </li>`).join("");
-    $("#center-title").textContent = `${cur.name} · ${cellName}`;
+    $("#center-title").textContent = `${cur.name} · ${window.MPBoard.name(cur.cell, window.I18N.lang)}`;
     $("#center-balance").textContent = `${t("game.yourBalance")}: ${balances(cur, " / ")}`;
     const r = m.lastRoll;
     if (r) $$("#dice .die").forEach((d, i) => (d.dataset.face = i ? r.b : r.a));
     $("#roll-result").innerHTML = r ? `${r.a} + ${r.b} = ${r.sum}${r.double ? `<em>${t("game.double")}</em>` : ""}` : "";
-    renderActions();
-    $("#sector-body").innerHTML = `<img src="/assets/img/${cellImg}.png" alt="" /><div><div class="sector-name" data-testid="sector-name">${cellName}</div><div class="sub sub--xs">${t(`scn.${m.scenario}.name`)} · ${t("game.round")} ${m.roundNo}</div></div>`;
     $("#history-list").innerHTML = m.history.recent(12).map(histItem).join("");
     $("#history-list").scrollTop = 1e6;
-    renderBoardPlaceholder();
-  };
-
-  const renderBoardPlaceholder = () => {
-    const board = $("#board");
-    if (board.querySelector(".board-corner")) return;
-    const corners = [["tl", "narmonyon", "NARMONYON CENTRARY"], ["tr", "anomaly", "ANOMALY OF PROBABILITY"], ["bl", null, "BLACK HOLE"], ["br", "cosmoport", "ISTOK COSMOPORT"]];
-    board.insertAdjacentHTML("beforeend", corners.map(([pos, img, label]) =>
-      `<div class="board-corner corner-${pos}" data-testid="board-corner-${pos}"><img src="/assets/img/${img ? "obj-" + img : "blackhole"}.png" alt="" /><span>${label}</span></div>`).join("") +
-      `<p class="board-soon" data-i18n="game.boardSoon">${t("game.boardSoon")}</p>`);
-  };
-
-  const animateRoll = (done) => {
-    $$("#dice .die").forEach((d) => {
-      d.classList.remove("is-rolling");
-      void d.offsetWidth;
-      d.classList.add("is-rolling");
-    });
-    setTimeout(done, 600);
-  };
-
-  // Bot loop (placeholder strategy until step 5): roll, then end turn
-  let botTimer = null;
-  const scheduleBot = () => {
-    clearTimeout(botTimer);
-    const m = ui.match;
-    if (!m || ui.screen !== "game" || !m.current.isBot) return;
-    botTimer = setTimeout(() => {
-      if (ui.match !== m) return;
-      if (m.phase === "await_roll") animateRoll(() => m.roll());
-      else if (m.phase === "await_end") m.endTurn();
-    }, 900);
+    window.MPGame.render();
   };
 
   /* ---------- events ---------- */
@@ -316,11 +276,6 @@
     }
     if (el.id === "btn-draw") return drawStep();
     if (el.id === "btn-continue") return resumeMatch();
-    if (el.id === "btn-roll") {
-      el.disabled = true;
-      return animateRoll(() => ui.match.roll());
-    }
-    if (el.id === "btn-end-turn") return ui.match.endTurn();
     if (el.id === "btn-all-history") return openModal(t("game.history"), `<ul class="history-list history-list--full" data-testid="full-history-list">${ui.match.history.entries.map(histItem).join("")}</ul>`);
     if (el.dataset.paneBtn) {
       $("#screen-game").dataset.paneActive = el.dataset.paneBtn;
@@ -355,5 +310,6 @@
   window.I18N.apply();
   document.dispatchEvent(new CustomEvent("langchange", { detail: window.I18N.lang }));
   go("start");
+  window.MPApp = { toast, renderGame };
   window.MP = { ui, go }; // debug hook
 })();

@@ -170,5 +170,7 @@
     document.dispatchEvent(new CustomEvent("langchange", { detail: l }));
   };
 
-  window.I18N = { t, apply, setLang, get lang() { return lang; }, langs: ["ru", "en", "uk"] };
+  const extend = (add) => Object.entries(add).forEach(([k, [r, u, e]]) => Object.assign(ru, { [k]: r }) && Object.assign(uk, { [k]: u }) && Object.assign(en, { [k]: e }));
+
+  window.I18N = { t, apply, setLang, extend, get lang() { return lang; }, langs: ["ru", "en", "uk"] };
 })();
