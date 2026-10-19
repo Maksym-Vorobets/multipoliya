@@ -1,0 +1,27 @@
+{
+  "summary": "Comprehensive Playwright testing of Step 3/4 for Мультиполия PWA. Verified: board renders 4 corners (c0 Istok Cosmoport, c10 Black Hole, c20 Narmonyon, c30 Anomaly) plus exactly 72 side cells with data-testid='cell-{pos}-{ring}', 4 tokens (token-{color}) start on c0. Deterministic rolling via MP.ui.match.roll([a,b]) works; after a station roll (2+3 → pos 5) two reachable options appear (ring-switch allowed on stations). Clicking a non-option cell triggers the 'недоступна' toast; clicking an option highlights the cell and shows confirm-move-btn; confirming animates the token along the full path (one cell at a time). Kapmonia landing on a free station opens dialog with 'Купить · 200 $' (dlg-btn-0), 'Отказаться (аукцион)', 'Вернуться к полю'; buying debits 200$, sets owner on cell (owners count = 1, border + marks update). Rent flow with 2 humans: second human landing on the first human's station triggers mandatory dialog (modal-x hidden display='none', turnState.due set); paying rent (dlg-btn-0) correctly transfers 25$ (payer 2000→1975, owner 1800→1825). All 5 scenarios (kap_kap, kap_nar, nar_nar, gos_gos, kap_gos) run full bot-only turns for 2 rounds with ZERO JS errors (buy/auction/joint/vote/rent/build/anomaly/blackhole paths all exercised by bots). Persistence: reload + start-continue-btn restores turnNo, player positions, and cell ownership exactly. Language switch (RU→EN) re-translates history entries ('Покупка Ст. Орион 11' → 'Bought Orion St. 11'). Mobile 390px: board width 370px, no horizontal overflow, mobile tabs (board/players/history) switch data-pane-active correctly.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "game.js is 640 lines and starting to accumulate many responsibilities (dialog, board render, token animation, bot logic, event routing). Consider splitting into game-render.js, game-flows.js, game-bots.js for step 5+.",
+    "economy.js: In perform() case 'buy'/'indBuy', the opt may be null when buttons passed opts[0] with amount===0 — currently kap buy always has amount>0 so safe, but defensive null-check on opt would prevent regressions when adding free-purchase action variants.",
+    "state.js Match.endTurn triggers completeRound() which may change roundNo *after* MPEco.everyTurnStart runs (which uses turnsTaken % 10). Order is fine today but note the subtle coupling for step 5+ when loan logic grows.",
+    "game.js roll() sets busy=true then can early-return without clearing busy if startTurnChecks returns false (line 452: `return (busy = false)` — OK, but easy to break on refactor). Minor.",
+    "No visible 'cannot end turn while rent is due' UI blocker beyond the toast + reopened dialog; the end-turn-btn is still enabled visually. Consider disabling end-turn-btn whenever m.turnState.due is set to make the mandatory-action state clearer.",
+    "Debug hook MP.ui.match is only present after a match is created — history item translation relies on cell lookup by MPBoard.cells which is global and fine.",
+    "SIDES array in board.js: slot token 'borgi_chance' puts chance on inner, borgi on outer via reverse() — correct per spec but a comment explaining the convention would help future contributors."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "100%"},
+  "seed_data_creation": "localStorage.clear() before each scenario; no persistent seed left behind.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Step 3+4 fully functional. Debug hooks: window.MP.ui.match (live Match), window.MPBoard, window.MPEco. Deterministic rolls via MP.ui.match.roll([a,b]) during phase='await_roll'. Turning all players to bots: MP.ui.match.players.forEach(p=>{p.isBot=true;p.botType=p.botType||'neutral'}); MP.ui.match.changed(); Each bot turn takes ~3–4s. All data-testids present and reliable (dlg-btn-N for dialog options, auction-bid-input/btn/pass, joint-partner-{color}, joint-confirm-btn, vote-yes-btn/vote-no-btn, bh-pay-btn/bh-skip-btn, anomaly-roll-btn, prop-mortgage/sell/tender/collect-{id}, prop-loan-btn, loan-amount-input, loan-confirm-btn, prop-repay-btn, cell-actions-btn, confirm-move-btn, end-turn-btn, roll-dice-btn). Chance/Borgi cards still placeholder as expected.",
+  "rca of the issue": "No issues found."
+}

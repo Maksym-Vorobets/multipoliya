@@ -19,9 +19,15 @@ Build the browser PWA game «Мультиполия» from the spec (Техни�
 ## Step plan
 1. PWA + markup + CSS variables — DONE (2026-06)
 2. State management classes — DONE (2026-06): js/state.js (Wallet usd/rub/nar, Player, HistoryLog with i18n keys, Bank goldPrice/priceIndex, Match: roll/doubles/3 doubles→Black Hole, endTurn, completeRound benefit/UBI, localStorage save + «Продолжить партию»), placeholder bot loop
-3. Board generation (2 rings × 36 cells + 4 corners), dice, zigzag route calculation
-4. Economy controllers: Kapmonia / Gosmonia / Narmonia (buying, shares, rent, UBI, taxes, loans, construction)
-5. Events & UI: Chance/Borgi modals, voting, bots, results screen
+3. Board + movement + token animation — DONE (2026-06): js/board.js (40 positions, 2 rings × 36 + 4 corners, groups, price list, route graph: ring switch at corners and stations), css/board.css, game.js (render, highlight options, confirm move, smooth token walk)
+4. Economy — DONE (2026-06): js/economy.js — Kapmonia (buy, auction, rent with «Взыскать аренду», tender, modules/dome, self-rent 25%, mortgage, sell to bank, loans 5%/3% per 10 turns, taxes every 10 rounds), Gosmonia (build object/module/dome with 25% payout, ordinary/double rent, +50 ₽/round, quota 5 builds per 7 rounds → Black Hole), Narmonia (individual/joint purchase, public construction by vote, tariff rent into fund refunded by shares, 1% tax returned equally), hybrids kap_nar / kap_gos; stats «Строительство»/«Уровень жизни»; basic bot strategies
+5. Chance/Borgi cards (texts in /app/memory/cards/*.txt), inflation/deflation, results screen, menu, ad bonus (MOCK), smarter bots — NEXT
+
+## Assumptions to confirm with customer
+- Price list per color group (60…350 $, ring 12 = ×1.2), module cost, dome = 80% of module, rent multipliers 1/3.5/11.5/27.5/35/40
+- Route scheme: ring switch only via corners and stations
+- Kvantal = pay 10% of balance, Icite = grant 50; Narmonyon = +1 g in Narmonia scenarios; Black Hole exit fine 50 (0.5 g)
+- Auction start = 50% of price; mortgage 50% / redeem 55%; sale to bank 75%
 
 ## Backlog
 - P1: Online match (rooms), admin panel for texts, results scoring (Construction / Living standard / Capital)
