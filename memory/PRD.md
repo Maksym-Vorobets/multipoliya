@@ -18,7 +18,7 @@ Build the browser PWA game «Мультиполия» from the spec (Техни�
 
 ## Step plan
 1. PWA + markup + CSS variables — DONE (2026-06)
-2. State management classes (Match, Player, balances in 3 currencies, history, turn)
+2. State management classes — DONE (2026-06): js/state.js (Wallet usd/rub/nar, Player, HistoryLog with i18n keys, Bank goldPrice/priceIndex, Match: roll/doubles/3 doubles→Black Hole, endTurn, completeRound benefit/UBI, localStorage save + «Продолжить партию»), placeholder bot loop
 3. Board generation (2 rings × 36 cells + 4 corners), dice, zigzag route calculation
 4. Economy controllers: Kapmonia / Gosmonia / Narmonia (buying, shares, rent, UBI, taxes, loans, construction)
 5. Events & UI: Chance/Borgi modals, voting, bots, results screen
