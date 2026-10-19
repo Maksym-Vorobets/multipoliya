@@ -7,6 +7,7 @@ const ASSETS = [
   "/css/base.css",
   "/css/screens.css",
   "/js/i18n.js",
+  "/js/state.js",
   "/js/app.js",
   "/assets/img/blackhole.png",
   "/assets/img/mars.png",

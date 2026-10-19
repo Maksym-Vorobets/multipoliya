@@ -40,6 +40,12 @@
     "rules.body": "<h4>Цель</h4><p>Развивать экономику на поле из двух кругов, строить объекты и повышать уровень жизни. Итог считается по показателям «Строительство», «Уровень жизни» и «Капитал».</p><h4>Ход</h4><p>Игрок бросает два кубика. Система показывает доступные конечные клетки с учётом переходов между кругами (зигзаг). Игрок выбирает клетку, и система выполняет её действие.</p><h4>Экономические модели</h4><p><b>Капмония</b> — частная собственность, доллары: покупка, аренда, аукцион, модули и купол, налоги, кредиты, залог.</p><p><b>Госмония</b> — государственная собственность, рубли: строительство за счёт госфонда, премии, дотации и периодические начисления.</p><p><b>Нармония</b> — народная собственность, Нармонит (грамм золотого эквивалента): индивидуальная и совместная покупка, общественное строительство, голосования, ББД 1 г за круг ходов.</p><h4>Карточки</h4><p>Chance и Borgi содержат финансовые события, перемещения, инфляцию/дефляцию и голосования.</p><h4>Банк</h4><p>Система ведёт все расчёты автоматически: балансы, аренду, налоги, кредиты и возвраты.</p>",
     "common.close": "Закрыть", "common.ok": "Понятно",
     "app.installed": "Игра доступна офлайн-кэшем",
+    "start.continue": "Продолжить партию", "game.endTurn": "Завершить ход", "game.botThinking": "Ход бота…",
+    "game.onBenefit": "На пособии", "game.round": "Круг", "game.double": "Дубль!",
+    "h.created": "Партия создана: {scenario}", "h.start": "Стартовые суммы:", "h.roll": "Бросок: {a} + {b} = {sum}",
+    "h.rollDouble": "Бросок: {a} + {b} = {sum} (дубль)", "h.threeDoubles": "Три дубля подряд — перемещение в Black Hole",
+    "h.extraTurn": "Дополнительный ход за дубль", "h.endTurn": "Завершил ход", "h.round": "Круг ходов {n} завершён",
+    "h.benefit": "Пособие:", "h.ubi": "ББД:", "h.credit": "Начисление:", "h.debit": "Списание:", "h.transfer": "Перевод → {to}:",
   };
 
   const en = {
@@ -83,6 +89,12 @@
     "rules.body": "<h4>Goal</h4><p>Grow the economy on a two-ring board, build objects and raise the living standard. Results are scored by Construction, Living standard and Capital.</p><h4>Turn</h4><p>Roll two dice. The system shows reachable destination cells including ring transitions (zigzag). Pick a cell and the system resolves its action.</p><h4>Economic models</h4><p><b>Kapmonia</b> — private property, dollars: buying, rent, auctions, modules and domes, taxes, loans, mortgages.</p><p><b>Gosmonia</b> — state property, rubles: construction funded by the state fund, bonuses, subsidies and periodic payments.</p><p><b>Narmonia</b> — people's property, Narmonit (gram of gold equivalent): individual and joint purchase, public construction, voting, UBI of 1 g per round.</p><h4>Cards</h4><p>Chance and Borgi contain financial events, moves, inflation/deflation and votes.</p><h4>Bank</h4><p>The system handles all calculations: balances, rent, taxes, loans and refunds.</p>",
     "common.close": "Close", "common.ok": "Got it",
     "app.installed": "The game is cached for offline use",
+    "start.continue": "Continue match", "game.endTurn": "End turn", "game.botThinking": "Bot is playing…",
+    "game.onBenefit": "On benefit", "game.round": "Round", "game.double": "Double!",
+    "h.created": "Match created: {scenario}", "h.start": "Starting funds:", "h.roll": "Roll: {a} + {b} = {sum}",
+    "h.rollDouble": "Roll: {a} + {b} = {sum} (double)", "h.threeDoubles": "Three doubles in a row — moved to Black Hole",
+    "h.extraTurn": "Extra turn for a double", "h.endTurn": "Ended the turn", "h.round": "Round {n} completed",
+    "h.benefit": "Benefit:", "h.ubi": "UBI:", "h.credit": "Credit:", "h.debit": "Debit:", "h.transfer": "Transfer → {to}:",
   };
 
   const uk = {
@@ -126,6 +138,12 @@
     "rules.body": "<h4>Мета</h4><p>Розвивати економіку на полі з двох кіл, будувати об'єкти та підвищувати рівень життя. Підсумок рахується за показниками «Будівництво», «Рівень життя» і «Капітал».</p><h4>Хід</h4><p>Гравець кидає два кубики. Система показує доступні кінцеві клітинки з урахуванням переходів між колами (зигзаг). Гравець обирає клітинку, і система виконує її дію.</p><h4>Економічні моделі</h4><p><b>Капмонія</b> — приватна власність, долари: купівля, оренда, аукціон, модулі та купол, податки, кредити, застава.</p><p><b>Госмонія</b> — державна власність, рублі: будівництво коштом держфонду, премії, дотації та періодичні нарахування.</p><p><b>Нармонія</b> — народна власність, Нармоніт (грам золотого еквівалента): індивідуальна та спільна купівля, громадське будівництво, голосування, ББД 1 г за коло ходів.</p><h4>Картки</h4><p>Chance і Borgi містять фінансові події, переміщення, інфляцію/дефляцію та голосування.</p><h4>Банк</h4><p>Система веде всі розрахунки автоматично: баланси, оренду, податки, кредити та повернення.</p>",
     "common.close": "Закрити", "common.ok": "Зрозуміло",
     "app.installed": "Гра доступна з офлайн-кешу",
+    "start.continue": "Продовжити партію", "game.endTurn": "Завершити хід", "game.botThinking": "Хід бота…",
+    "game.onBenefit": "На допомозі", "game.round": "Коло", "game.double": "Дубль!",
+    "h.created": "Партію створено: {scenario}", "h.start": "Стартові суми:", "h.roll": "Кидок: {a} + {b} = {sum}",
+    "h.rollDouble": "Кидок: {a} + {b} = {sum} (дубль)", "h.threeDoubles": "Три дублі поспіль — переміщення в Black Hole",
+    "h.extraTurn": "Додатковий хід за дубль", "h.endTurn": "Завершив хід", "h.round": "Коло ходів {n} завершено",
+    "h.benefit": "Допомога:", "h.ubi": "ББД:", "h.credit": "Нарахування:", "h.debit": "Списання:", "h.transfer": "Переказ → {to}:",
   };
 
   const dict = { ru, en, uk };

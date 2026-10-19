@@ -3,13 +3,13 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-  // Static config (step 1). Economics are wired in steps 2–4.
+  // UI-level scenario list; economic rules live in MPState.SCENARIO_RULES
   const SCENARIOS = [
-    { id: "kap_kap", currencies: ["usd"], start: { usd: 2000 } },
-    { id: "kap_nar", currencies: ["usd", "nar"], start: { usd: 2000, nar: 1 } },
-    { id: "nar_nar", currencies: ["nar"], start: { nar: 1 } },
-    { id: "gos_gos", currencies: ["rub"], start: { rub: 50 } },
-    { id: "kap_gos", currencies: ["rub"], start: { rub: 2000 } }, // TODO: confirm start sum with customer
+    { id: "kap_kap", currencies: ["usd"] },
+    { id: "kap_nar", currencies: ["usd", "nar"] },
+    { id: "nar_nar", currencies: ["nar"] },
+    { id: "gos_gos", currencies: ["rub"] },
+    { id: "kap_gos", currencies: ["rub"] },
   ];
   const COLORS = ["blue", "violet", "yellow", "red"];
   const BOT_TYPES = ["neutral", "capitalist", "narmonist"];
@@ -60,9 +60,11 @@
     document.body.dataset.screen = name;
     document.body.classList.remove("menu-open");
     $$(".screen").forEach((s) => s.classList.toggle("is-active", s.id === `screen-${name}`));
+    if (name === "start") $("#btn-continue").hidden = !localStorage.getItem("mp.match");
     if (name === "setup") renderSetup();
     if (name === "draw") renderDraw();
     if (name === "game") renderGame();
+    if (name === "game") scheduleBot();
     window.scrollTo({ top: 0 });
   };
 
@@ -158,47 +160,87 @@
     renderDraw();
   };
 
-  /* ---------- match (preview shell, full state in step 2) ---------- */
+  /* ---------- match (state lives in MPState.Match) ---------- */
+  const { Match } = window.MPState;
+  const CELL_INFO = { cosmoport: ["Istok Cosmoport", "obj-cosmoport"], blackhole: ["Black Hole", "blackhole"] }; // full board in step 3
+  const balances = (p, sep = " · ") => ui.match.currencies.map((c) => fmt(p.wallet.get(c), c)).join(sep);
+  const moneyText = (list) => list.map(({ cur, amount }) => `${amount > 0 ? "+" : "−"}${fmt(Math.abs(amount), cur)}`).join(" · ");
+
+  const histText = (e) => {
+    const params = { ...e.params };
+    Object.keys(params).forEach((k) => {
+      if (typeof params[k] === "string" && params[k].startsWith("@")) params[k] = t(params[k].slice(1));
+    });
+    return t(e.key, params) + (e.money ? ` ${moneyText(e.money)}` : "");
+  };
+  const histItem = (e) => {
+    const p = e.playerId && ui.match.player(e.playerId);
+    return `<li data-testid="history-entry">${p ? `<span>${esc(p.name)} · </span>` : ""}${esc(histText(e))}</li>`;
+  };
+
+  const attach = (m) => {
+    ui.match = m;
+    m.addEventListener("change", () => {
+      if (ui.screen === "game") renderGame();
+      scheduleBot();
+    });
+  };
+
   const createMatch = () => {
     const s = scn();
-    ui.match = {
-      scenario: s.id,
-      turnNo: 1,
-      order: ui.draw.order,
-      active: 0,
-      players: ui.draw.order.map((idx) => ({
-        idx,
-        name: playerName(idx),
-        color: COLORS[idx],
-        isBot: idx >= ui.real,
-        bot: ui.bots[idx],
-        balances: { ...s.start },
-      })),
-      history: [],
-    };
-    const h = ui.match.history;
-    h.push({ who: null, text: `${t("game.created")}: ${t(`scn.${s.id}.name`)}` });
-    ui.match.players.forEach((p) => h.push({ who: p.name, text: `${t("game.startSums")}: ${Object.entries(p.balances).map(([c, v]) => fmt(v, c)).join(" · ")}` }));
+    const players = ui.draw.order.map((idx) => ({
+      idx,
+      name: playerName(idx),
+      color: COLORS[idx],
+      isBot: idx >= ui.real,
+      botType: idx >= ui.real ? ui.bots[idx] : null,
+    }));
+    attach(Match.create({ scenario: s.id, currencies: s.currencies, players }));
     go("game");
+  };
+
+  const resumeMatch = () => {
+    const m = Match.load();
+    if (!m) return;
+    attach(m);
+    go("game");
+  };
+
+  const renderActions = () => {
+    const m = ui.match;
+    const p = m.current;
+    let html;
+    if (p.isBot) html = `<button class="btn" disabled data-testid="bot-turn-indicator">${t("game.botThinking")}</button>`;
+    else if (m.phase === "await_roll") html = `<button class="btn btn--primary" id="btn-roll" data-testid="roll-dice-btn">${t("game.roll")}</button>`;
+    else html = `<button class="btn btn--primary" id="btn-end-turn" data-testid="end-turn-btn">${t("game.endTurn")}</button>`;
+    $("#actions").innerHTML = html;
   };
 
   const renderGame = () => {
     const m = ui.match;
     if (!m) return go("start");
-    const cur = m.players[m.active];
+    const cur = m.current;
+    const [cellName, cellImg] = CELL_INFO[cur.cell] || [cur.cell, "obj-cosmoport"];
     $("#turn-no").textContent = m.turnNo;
+    $("#gold-price").textContent = m.bank.goldPrice.toLocaleString("ru-RU");
     $("#players-list").innerHTML = m.players.map((p, i) => `
       <li class="pl-item${i === m.active ? " is-active" : ""}" data-testid="player-card-${p.color}">
         <img src="/assets/img/token-${p.color}.png" alt="" />
         <div><div class="pl-name">${esc(p.name)}</div>
-          <div class="pl-bal">${t("game.balance")}: ${Object.entries(p.balances).map(([c, v]) => fmt(v, c)).join(" · ")}</div>
-          ${p.isBot ? `<div class="pl-bot">${t(`bot.${p.bot}`)}</div>` : ""}</div>
+          <div class="pl-bal" data-testid="player-balance-${p.color}">${t("game.balance")}: ${balances(p)}</div>
+          ${p.isBot ? `<div class="pl-bot">${t(`bot.${p.botType}`)}</div>` : ""}
+          ${p.status === "benefit" ? `<div class="pl-status" data-testid="player-status-${p.color}">${t("game.onBenefit")}</div>` : ""}</div>
         ${i === m.active ? `<span class="pl-tag">${t("game.yourTurn")}</span>` : "<span></span>"}
       </li>`).join("");
-    $("#center-title").textContent = `${cur.name} · ${t("game.start")}`;
-    $("#center-balance").textContent = `${t("game.yourBalance")}: ${Object.entries(cur.balances).map(([c, v]) => fmt(v, c)).join(" / ")}`;
-    $("#sector-body").innerHTML = `<img src="/assets/img/obj-cosmoport.png" alt="" /><div><div class="sector-name">Istok Cosmoport</div><div class="sub sub--xs">${t(`scn.${m.scenario}.name`)}</div></div>`;
-    $("#history-list").innerHTML = m.history.slice(-12).map((e) => `<li>${e.who ? `<span>${esc(e.who)} · </span>` : ""}${esc(e.text)}</li>`).join("");
+    $("#center-title").textContent = `${cur.name} · ${cellName}`;
+    $("#center-balance").textContent = `${t("game.yourBalance")}: ${balances(cur, " / ")}`;
+    const r = m.lastRoll;
+    if (r) $$("#dice .die").forEach((d, i) => (d.dataset.face = i ? r.b : r.a));
+    $("#roll-result").innerHTML = r ? `${r.a} + ${r.b} = ${r.sum}${r.double ? `<em>${t("game.double")}</em>` : ""}` : "";
+    renderActions();
+    $("#sector-body").innerHTML = `<img src="/assets/img/${cellImg}.png" alt="" /><div><div class="sector-name" data-testid="sector-name">${cellName}</div><div class="sub sub--xs">${t(`scn.${m.scenario}.name`)} · ${t("game.round")} ${m.roundNo}</div></div>`;
+    $("#history-list").innerHTML = m.history.recent(12).map(histItem).join("");
+    $("#history-list").scrollTop = 1e6;
     renderBoardPlaceholder();
   };
 
@@ -211,17 +253,26 @@
       `<p class="board-soon" data-i18n="game.boardSoon">${t("game.boardSoon")}</p>`);
   };
 
-  const rollPreview = () => {
+  const animateRoll = (done) => {
     $$("#dice .die").forEach((d) => {
       d.classList.remove("is-rolling");
       void d.offsetWidth;
       d.classList.add("is-rolling");
-      d.dataset.face = rollDie();
     });
-    const [a, b] = $$("#dice .die").map((d) => +d.dataset.face);
+    setTimeout(done, 600);
+  };
+
+  // Bot loop (placeholder strategy until step 5): roll, then end turn
+  let botTimer = null;
+  const scheduleBot = () => {
+    clearTimeout(botTimer);
     const m = ui.match;
-    m.history.push({ who: m.players[m.active].name, text: `${a} + ${b} = ${a + b}` });
-    setTimeout(renderGame, 600);
+    if (!m || ui.screen !== "game" || !m.current.isBot) return;
+    botTimer = setTimeout(() => {
+      if (ui.match !== m) return;
+      if (m.phase === "await_roll") animateRoll(() => m.roll());
+      else if (m.phase === "await_end") m.endTurn();
+    }, 900);
   };
 
   /* ---------- events ---------- */
@@ -264,13 +315,19 @@
       return startDraw();
     }
     if (el.id === "btn-draw") return drawStep();
-    if (el.id === "btn-roll") return rollPreview();
+    if (el.id === "btn-continue") return resumeMatch();
+    if (el.id === "btn-roll") {
+      el.disabled = true;
+      return animateRoll(() => ui.match.roll());
+    }
+    if (el.id === "btn-end-turn") return ui.match.endTurn();
+    if (el.id === "btn-all-history") return openModal(t("game.history"), `<ul class="history-list history-list--full" data-testid="full-history-list">${ui.match.history.entries.map(histItem).join("")}</ul>`);
     if (el.dataset.paneBtn) {
       $("#screen-game").dataset.paneActive = el.dataset.paneBtn;
       $$(".mobile-tabs button").forEach((b) => b.classList.toggle("is-active", b === el));
       return;
     }
-    if (["btn-finish-game", "btn-bonus", "btn-game-menu", "btn-all-history"].includes(el.id)) return toast(t("game.notYet"));
+    if (["btn-finish-game", "btn-bonus", "btn-game-menu"].includes(el.id)) return toast(t("game.notYet"));
   });
 
   document.addEventListener("input", (e) => {

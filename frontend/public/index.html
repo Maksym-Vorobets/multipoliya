@@ -66,6 +66,7 @@
         <div class="stack">
           <button class="btn btn--primary btn--lg" data-go="setup" data-i18n="start.newGame" data-testid="start-new-game-btn">Новая игра</button>
           <button class="btn btn--ghost btn--lg" data-open="rules" data-i18n="start.rules" data-testid="start-rules-btn">Правила</button>
+          <button class="btn btn--ghost btn--lg" id="btn-continue" hidden data-i18n="start.continue" data-testid="start-continue-btn">Продолжить партию</button>
         </div>
       </div>
       <div class="start-visual" aria-hidden="true">
@@ -160,9 +161,8 @@
               <div class="die" data-face="1"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
               <div class="die" data-face="3"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
             </div>
-            <div class="actions" id="actions" data-testid="action-panel">
-              <button class="btn btn--primary" id="btn-roll" data-i18n="game.roll" data-testid="roll-dice-btn">Бросить кубики</button>
-            </div>
+            <p class="roll-result" id="roll-result" data-testid="roll-result"></p>
+            <div class="actions" id="actions" data-testid="action-panel"></div>
           </div>
         </div>
       </div>
@@ -200,6 +200,7 @@
   <div class="toasts" id="toasts" data-testid="toasts"></div>
 
   <script src="/js/i18n.js"></script>
+  <script src="/js/state.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>
