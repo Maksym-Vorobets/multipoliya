@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend-only testing of the Мультиполия PWA (vanilla JS at /public). All functional and PWA tests passed. Verified: start screen title, 3-language switcher (RU/EN/UA) with localStorage persistence, Rules & Policy modals (close via X, backdrop, Escape), setup screen with all 5 scenario cards, total/real steppers with proper min/max bounds (2..4 and 1..total), player name inputs + bot behavior selects, online tab toast, missing-name error toast (only when real>1), draw screen with human roll + bot auto-roll + unique final order + Открыть button, game shell with player-card-{color} in drawn order, correct starting balances per scenario (e.g. kap_nar => 2000 $ + 1,00 g), start history entries, dice roll animation + history append, finish/bonus/menu toast placeholders, service worker registered, manifest.json & icons return 200, mobile burger menu & mobile tabs (board/players/history) switching data-pane-active.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "SCENARIOS kap_gos entry still has TODO comment: 'confirm start sum with customer' (/app/frontend/public/js/app.js line 12). Confirm whether 2000 ₽ is correct for Capital/State scenario or should include multiple currencies.",
+    "In the names change handler, typing in a human player's input updates ui.names[i] but the DOM input values are re-rendered on language switch (go(ui.screen) in langchange handler) which could reset focus/caret in setup. Minor UX concern.",
+    "renderBoardPlaceholder short-circuits with early return if board already has .board-corner, so later re-renders (lang change) won't re-translate the hard-coded corner labels. If i18n of corner labels is desired in step 3, this needs refactor."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "test_credentials": "None required",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Step 1 (PWA shell + markup + i18n + setup/draw/game shells) is fully functional. Board cells are a placeholder (step 3). Vanilla JS app lives in /app/frontend/public, served through CRA public dir. Test with https://game-from-spec-1.preview.emergentagent.com. All data-testid selectors in index.html work as documented.",
+  "rca of the issue": "No issues found."
+}
