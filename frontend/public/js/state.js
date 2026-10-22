@@ -237,7 +237,9 @@
       const { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells, moveOptions, turnState, flags, decks } = this;
       return { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells, moveOptions, turnState, flags, decks };
     }
-    save() { localStorage.setItem(SAVE_KEY, JSON.stringify(this)); }
+    save() {
+      if (!this.online) localStorage.setItem(SAVE_KEY, JSON.stringify(this));
+    }
     static load() {
       const raw = localStorage.getItem(SAVE_KEY);
       if (!raw) return null;

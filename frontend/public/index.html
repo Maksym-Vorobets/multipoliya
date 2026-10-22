@@ -76,6 +76,7 @@
         <img class="bh" src="/assets/img/blackhole.png" alt="" />
         <img class="planet planet--mars" src="/assets/img/mars.png" alt="" />
         <img class="planet planet--moon" src="/assets/img/moon.png" alt="" />
+        <a class="admin-link" href="#admin" data-i18n="adm.link" data-testid="admin-link">Администрирование</a>
         <p class="start-note" data-i18n="start.note">Онлайн или против ботов · До 4 игроков</p>
       </div>
     </section>
@@ -187,6 +188,62 @@
         <button data-pane-btn="history" data-i18n="game.tabHistory" data-testid="tab-history">История</button>
       </nav>
     </section>
+    <!-- ===== Online lobby ===== -->
+    <section class="screen screen-draw" id="screen-lobby" data-testid="screen-lobby">
+      <div class="draw-wrap">
+        <h1 class="h1" data-i18n="net.title">Онлайн-партия</h1>
+        <p class="sub" id="lobby-sub"></p>
+        <div id="lobby-join" class="stack" hidden>
+          <label class="p-field"><input type="text" id="lobby-code-input" maxlength="6" data-i18n-ph="net.codePh" data-testid="lobby-code-input" /></label>
+          <label class="p-field"><input type="text" id="lobby-name-input" maxlength="16" data-i18n-ph="net.yourName" data-testid="lobby-name-input" /></label>
+          <button class="btn btn--primary btn--lg" id="btn-lobby-join" data-i18n="net.join" data-testid="lobby-join-btn">Присоединиться</button>
+        </div>
+        <div id="lobby-room" class="stack" hidden>
+          <div class="panel panel--gold lobby-code">
+            <span class="eyebrow" data-i18n="net.code">Код комнаты</span>
+            <b id="lobby-code" data-testid="lobby-room-code"></b>
+            <span class="eyebrow" data-i18n="net.link">Ссылка-приглашение</span>
+            <div class="lobby-link"><input id="lobby-link" readonly data-testid="lobby-invite-link" /><button class="btn btn--sm" id="btn-lobby-copy" data-i18n="net.copy" data-testid="lobby-copy-btn">Скопировать</button></div>
+          </div>
+          <ul class="draw-list" id="lobby-seats" data-testid="lobby-seats"></ul>
+          <button class="btn btn--primary btn--lg" id="btn-lobby-start" data-i18n="net.start" data-testid="lobby-start-btn">Начать партию</button>
+          <button class="btn btn--ghost btn--lg" id="btn-lobby-leave" data-i18n="net.leave" data-testid="lobby-leave-btn">Выйти из комнаты</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Admin ===== -->
+    <section class="screen screen-admin" id="screen-admin" data-testid="screen-admin">
+      <div class="admin-wrap">
+        <h1 class="h1" data-i18n="adm.title">Админ-панель</h1>
+        <div id="admin-login" class="panel panel--gold admin-login stack">
+          <label class="p-field"><input type="email" id="admin-email" data-i18n-ph="adm.email" data-testid="admin-email-input" /></label>
+          <label class="p-field"><input type="password" id="admin-password" data-i18n-ph="adm.password" data-testid="admin-password-input" /></label>
+          <p class="adm-error" id="admin-error" data-testid="admin-login-error"></p>
+          <button class="btn btn--primary btn--lg" id="admin-login-btn" data-i18n="adm.login" data-testid="admin-login-btn">Войти</button>
+          <button class="btn btn--ghost" data-go="start" data-i18n="adm.back" data-testid="admin-back-btn">На главный экран</button>
+        </div>
+        <div id="admin-editor" hidden>
+          <div class="adm-bar">
+            <div class="tabs">
+              <button class="tab" data-adm-tab="rules" data-i18n="adm.rules" data-testid="adm-tab-rules">Правила</button>
+              <button class="tab" data-adm-tab="ui" data-i18n="adm.ui" data-testid="adm-tab-ui">Тексты интерфейса</button>
+              <button class="tab" data-adm-tab="cards" data-i18n="adm.cards" data-testid="adm-tab-cards">Карточки</button>
+            </div>
+            <input class="adm-search" id="admin-search" data-i18n-ph="adm.search" data-testid="adm-search-input" />
+            <div class="select" ><select id="admin-deck" data-testid="adm-deck-select"></select></div>
+          </div>
+          <div id="admin-list" class="adm-list" data-testid="adm-list"></div>
+          <div class="adm-actions">
+            <button class="btn btn--primary" id="admin-save-btn" data-i18n="adm.save" data-testid="adm-save-btn">Сохранить изменения</button>
+            <button class="btn btn--ghost" id="admin-reset-btn" data-i18n="adm.reset" data-testid="adm-reset-btn">Сбросить к исходному</button>
+            <button class="btn btn--ghost" data-go="start" data-i18n="adm.back">На главный экран</button>
+            <button class="btn btn--ghost" id="admin-logout-btn" data-i18n="adm.logout" data-testid="adm-logout-btn">Выйти</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== Results ===== -->
     <section class="screen screen-results" id="screen-results" data-testid="screen-results">
       <div class="results-wrap">
@@ -212,6 +269,7 @@
 
   <div class="toasts" id="toasts" data-testid="toasts"></div>
 
+  <script>window.MP_API = "%REACT_APP_BACKEND_URL%" + "/api";</script>
   <script src="/js/i18n.js"></script>
   <script src="/js/prices.js"></script>
   <script src="/js/board.js"></script>
@@ -221,5 +279,7 @@
   <script src="/js/cards.js"></script>
   <script src="/js/game.js"></script>
   <script src="/js/app.js"></script>
+  <script src="/js/net.js"></script>
+  <script src="/js/admin.js"></script>
 </body>
 </html>

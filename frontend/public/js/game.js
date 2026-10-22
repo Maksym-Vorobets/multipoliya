@@ -81,6 +81,11 @@
   let panelPlayer = null;
   const animating = new Set();
   const nm = (id) => B.name(id, lang());
+  const net = () => (m && m.online && window.MPNet.session) || null;
+  const isLocalHuman = (p) => !p.isBot && (!net() || p.idx === net().seat);
+  const isDriver = () => (m.current.isBot ? !net() || net().seat === 0 : isLocalHuman(m.current));
+  // Ask a human player: locally or via the room (remote device)
+  const ask = (p, spec) => (isLocalHuman(p) || !net() ? dialog(spec) : window.MPNet.prompt(p.idx, spec));
 
   /* ================= Dialog (promise-based modal) ================= */
   let dlgResolve = null;
@@ -109,7 +114,7 @@
     const b = e.target.closest("[data-dlg]");
     if (b && dlgResolve) {
       const v = dlgValues[+b.dataset.dlg];
-      closeDialog(typeof v === "function" ? v() : v);
+      closeDialog(typeof v === "function" ? v() : v && v.valueFrom ? +$(v.valueFrom).value : v);
     } else if (e.target.closest("[data-close]") && dlgResolve) {
       e.stopPropagation();
       if (dlgClosable) closeDialog(null);
@@ -162,7 +167,12 @@
         <button class="cell" data-cell="${ids[1]}" data-testid="cell-${ids[1]}">${cellInner(ids[1])}</button></div>`;
     });
     board.insertAdjacentHTML("afterbegin", html);
-    board.insertAdjacentHTML("beforeend", `<div class="tokens" id="tokens"></div>`);
+    board.insertAdjacentHTML("beforeend", `<div class="tokens" id="tokens"><svg class="route" id="route" data-testid="route-preview"><polyline points="" /></svg></div>`);
+    board.addEventListener("mouseover", (e) => {
+      const el = e.target.closest(".cell.is-option");
+      if (el) drawRoute(el.dataset.cell);
+    });
+    board.addEventListener("mouseout", (e) => e.target.closest(".cell.is-option") && drawRoute(selected));
     new ResizeObserver(() => placeTokens()).observe(board);
     updateBoard();
   };
@@ -183,6 +193,26 @@
       el.classList.toggle("is-owned", owners.length > 0 || s.built);
     });
     renderTokens();
+    drawRoute(selected);
+  };
+  // Dashed preview of the route to a highlighted cell
+  const drawRoute = (id) => {
+    const line = $("#route polyline");
+    if (!line) return;
+    const opt = id && m.moveOptions && m.moveOptions.find((o) => o.id === id);
+    if (!opt) return line.setAttribute("points", "");
+    const p = m.current;
+    const pts = [p.cell, ...opt.path].map((c) => {
+      const { x, y } = cellCenter(c);
+      return `${x},${y}`;
+    });
+    line.setAttribute("points", pts.join(" "));
+  };
+  const cellCenter = (cellId) => {
+    const board = $("#board");
+    const r = $(`[data-cell="${cellId}"]`, board).getBoundingClientRect();
+    const br = board.getBoundingClientRect();
+    return { x: r.left - br.left + r.width / 2, y: r.top - br.top + r.height / 2 };
   };
   const tokenXY = (p, cellId) => {
     const board = $("#board");
@@ -254,8 +284,8 @@
       ${E.model(m, id) ? `<div class="sector-grid"><ul class="sector-owners">${owners}</ul><dl class="dlg-rows">${cellRows(id).map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl></div>` : ""}`;
   };
   const renderProps = () => {
-    const humans = m.players.filter((p) => !p.isBot);
-    const p = (m.current.isBot ? null : m.current) || humans.find((h) => h.id === panelPlayer) || humans[0];
+    const humans = m.players.filter((p) => isLocalHuman(p));
+    const p = (isLocalHuman(m.current) ? m.current : null) || humans.find((h) => h.id === panelPlayer) || humans[0];
     if (!p) return ($("#props-panel").innerHTML = "");
     panelPlayer = p.id;
     const ids = E.ownedCells(m, p);
@@ -284,6 +314,7 @@
     const p = m.current;
     const box = $("#actions");
     if (p.isBot) return (box.innerHTML = `<button class="btn" disabled data-testid="bot-turn-indicator">${t("game.botThinking")}</button>`);
+    if (!isLocalHuman(p)) return (box.innerHTML = `<button class="btn" disabled data-testid="remote-turn-indicator">${t("net.waitTurn", { name: esc(p.name) })}</button>`);
     const btns = [];
     if (m.phase === "await_roll") btns.push(`<button class="btn btn--primary" id="btn-roll" data-testid="roll-dice-btn" ${busy ? "disabled" : ""}>${t("game.roll")}</button>`);
     if (m.phase === "await_move") btns.push(selected
@@ -364,11 +395,11 @@
       let bid = null;
       if (p.isBot) bid = nextBid <= Math.min(botLimit(p, base), p.wallet.get(cur)) ? nextBid : null;
       else {
-        bid = await dialog({
+        bid = await ask(p, {
           title: `${t("g.auction")} · ${nm(id)}`, sub: `${t("g.bidder")}: ${p.name}`,
           rows: [[t("g.start"), fmt(Math.round((base * E.SP.auctionStartPercent) / 100), cur)], [t("g.highest"), high.p ? `${fmt(high.amount, cur)} (${esc(high.p.name)})` : "—"], [t("game.balance"), fmt(p.wallet.get(cur), cur)]],
           html: `<label class="dlg-input"><span>${t("g.amount")}</span><input type="number" id="bid-input" min="${nextBid}" step="10" value="${nextBid}" data-testid="auction-bid-input" /></label>`,
-          buttons: [{ label: t("g.bid"), primary: true, testid: "auction-bid-btn", value: () => +$("#bid-input").value }, { label: t("g.pass"), value: null, testid: "auction-pass-btn" }],
+          buttons: [{ label: t("g.bid"), primary: true, testid: "auction-bid-btn", value: { valueFrom: "#bid-input" } }, { label: t("g.pass"), value: null, testid: "auction-pass-btn" }],
           closable: false,
         });
         if (bid != null && (bid < nextBid || !p.wallet.has(cur, bid))) bid = null;
@@ -389,7 +420,7 @@
       let v;
       if (p === initiator) v = true;
       else if (p.isBot) v = p.botType === "narmonist" ? true : p.botType === "capitalist" ? Math.random() < 0.2 : Math.random() < 0.6;
-      else v = await dialog({ title: t("g.vote"), sub: `${nm(id)} · ${t("g.voter")}: ${p.name}`, rows: [[t("g.initiator"), esc(initiator.name)], [t("g.source"), t("g.bank")], [t("g.price"), fmt(E.price(m, id), m.scenario === "nar_nar" ? "usd" : E.fiatCur(m))]], buttons: [{ label: t("g.yes"), value: true, primary: true, testid: "vote-yes-btn" }, { label: t("g.no"), value: false, testid: "vote-no-btn" }], closable: false });
+      else v = await ask(p, { title: t("g.vote"), sub: `${nm(id)} · ${t("g.voter")}: ${p.name}`, rows: [[t("g.initiator"), esc(initiator.name)], [t("g.source"), t("g.bank")], [t("g.price"), fmt(E.price(m, id), m.scenario === "nar_nar" ? "usd" : E.fiatCur(m))]], buttons: [{ label: t("g.yes"), value: true, primary: true, testid: "vote-yes-btn" }, { label: t("g.no"), value: false, testid: "vote-no-btn" }], closable: false });
       if (v) yes++;
     }
     const ok = yes / voters.length >= 0.5;
@@ -415,7 +446,7 @@
       const can = E.canPayAny(p, E.payOpts(m, part));
       let ok;
       if (p.isBot) ok = can && p.botType !== "capitalist";
-      else ok = can && (await dialog({ title: t("g.joint"), sub: `${nm(id)} · ${p.name}`, rows: [[t("g.part"), fmt(part, m.scenario === "nar_nar" ? "usd" : E.fiatCur(m))]], buttons: [{ label: t("g.join"), value: true, primary: true }, { label: t("g.pass"), value: false }], closable: false }));
+      else ok = can && (await ask(p, { title: t("g.joint"), sub: `${nm(id)} · ${p.name}`, rows: [[t("g.part"), fmt(part, m.scenario === "nar_nar" ? "usd" : E.fiatCur(m))]], buttons: [{ label: t("g.join"), value: true, primary: true }, { label: t("g.pass"), value: false }], closable: false }));
       if (ok) partners.push(p);
     }
     E.jointBuy(m, id, partners);
@@ -442,7 +473,7 @@
     const sum = window.MPCards.summary(m, d);
     m.log({ key: "h.card", playerId: p.id, params: { deck: `@c.${kind}`, n: d.n, text: sum } });
     const html = `<div class="mp-card mp-card--${kind}" data-testid="card-view"><span class="mp-card-kind">${kind.toUpperCase()} · ${E.L("m_" + d.model)}</span>
-      ${lang() === "ru" ? `<p class="mp-card-text" data-testid="card-text">${esc(d.card.t)}</p>` : ""}<p class="mp-card-effect" data-testid="card-effect">${esc(sum)}</p></div>`;
+      <p class="mp-card-text" data-testid="card-text">${esc(d.card[lang() === "ru" ? "t" : lang()] || d.card.t)}</p><p class="mp-card-effect" data-testid="card-effect">${esc(sum)}</p></div>`;
     const title = `${t("c." + kind)} №${d.n}`;
     let choice = null;
     if (d.card.e[0] === "choice") {
@@ -461,7 +492,7 @@
 
   /* ================= Ad bonus (MOCK ad view) ================= */
   const adBonus = async () => {
-    const p = m.current.isBot ? m.players.find((x) => !x.isBot) : m.current;
+    const p = isLocalHuman(m.current) ? m.current : m.players.find((x) => isLocalHuman(x));
     if (!p) return;
     m.flags.ads = m.flags.ads || {};
     if (m.flags.ads[p.id] === m.roundNo) return window.MPApp.toast(t("ad.once"), "error");
@@ -532,8 +563,8 @@
       { label: t("game.finish"), value: "finish", testid: "menu-finish-btn" }, { label: t("game.bonus"), value: "bonus", testid: "menu-bonus-btn" },
       { label: t("nav.rules"), value: "rules", testid: "menu-rules-btn" }, { label: t("menu.home"), value: "home", testid: "menu-home-btn" },
       { label: t("g.back"), value: null, primary: true, testid: "menu-back-btn" }] });
-    if (v === "finish") return finishGame();
-    if (v === "bonus") return adBonus();
+    if (v === "finish") return net() && net().seat !== 0 ? window.MPApp.toast(t("net.hostOnly"), "error") : finishGame();
+    if (v === "bonus") return net() && !isDriver() ? window.MPApp.toast(t("net.yourTurnOnly"), "error") : adBonus();
     if (v === "rules") return dialog({ title: t("rules.title"), html: `<div class="modal-body">${t("rules.body")}</div>`, buttons: [{ label: t("common.ok"), value: true }] });
     if (v === "home") window.MPApp.go("start");
   };
@@ -694,7 +725,7 @@
   let botTimer = null;
   const scheduleBot = () => {
     clearTimeout(botTimer);
-    if (!m || document.body.dataset.screen !== "game" || !m.current.isBot || botBusy) return;
+    if (!m || document.body.dataset.screen !== "game" || !m.current.isBot || botBusy || (net() && net().seat !== 0)) return;
     botTimer = setTimeout(() => botTurn().then(scheduleBot), 300);
   };
 
@@ -705,7 +736,7 @@
     const cellEl = e.target.closest("#board .cell");
     if (cellEl) {
       const id = cellEl.dataset.cell;
-      if (m.phase === "await_move" && !m.current.isBot && !busy) {
+      if (m.phase === "await_move" && isLocalHuman(m.current) && !busy) {
         if (m.moveOptions.some((o) => o.id === id)) selected = id;
         else window.MPApp.toast(t("g.unavailable"), "error");
         return refresh();
@@ -713,11 +744,11 @@
       return renderSector(id);
     }
     const g = e.target.closest("[data-g]");
-    if (g && g.dataset.g === "confirm" && selected) return confirmMove(selected);
+    if (g && g.dataset.g === "confirm" && selected && isDriver()) return confirmMove(selected);
     if (g && g.dataset.g === "cell") return openCell();
-    if (e.target.closest("#btn-roll")) return roll();
-    if (e.target.closest("#btn-finish-game")) return busy || dlgResolve ? null : finishGame();
-    if (e.target.closest("#btn-bonus")) return dlgResolve ? null : adBonus();
+    if (e.target.closest("#btn-roll")) return isDriver() && roll();
+    if (e.target.closest("#btn-finish-game")) return busy || dlgResolve ? null : net() && net().seat !== 0 ? window.MPApp.toast(t("net.hostOnly"), "error") : finishGame();
+    if (e.target.closest("#btn-bonus")) return dlgResolve ? null : net() && !isDriver() ? window.MPApp.toast(t("net.yourTurnOnly"), "error") : adBonus();
     if (e.target.closest("#btn-game-menu")) return dlgResolve ? null : gameMenu();
     if (e.target.closest("#btn-end-turn")) return endTurn();
     const pr = e.target.closest("[data-prop]");
@@ -740,7 +771,22 @@
   });
 
   window.MPGame = {
-    attach(match) { m = match; selected = null; busy = false; botBusy = false; const b = $("#board"); b.dataset.built = ""; $$(".slot, .corner, .tokens", b).forEach((x) => x.remove()); },
+    attach(match) {
+      const same = m && m.id === match.id;
+      m = match;
+      selected = null;
+      if (same) return;
+      busy = false;
+      botBusy = false;
+      const b = $("#board");
+      b.dataset.built = "";
+      $$(".slot, .corner, .tokens", b).forEach((x) => x.remove());
+    },
+    isDriver: () => isDriver(),
+    promptLocal: async (spec) => {
+      while (dlgResolve || busy) await wait(400);
+      return dialog(spec);
+    },
     render() {
       if (!m) return;
       renderBoard();

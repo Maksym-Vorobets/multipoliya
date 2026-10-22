@@ -171,6 +171,17 @@
   };
 
   const extend = (add) => Object.entries(add).forEach(([k, [r, u, e]]) => Object.assign(ru, { [k]: r }) && Object.assign(uk, { [k]: u }) && Object.assign(en, { [k]: e }));
+  const defaults = {};
+  // Admin overrides: { ru: {key: text}, en: {...}, uk: {...} }
+  const override = (texts) => Object.entries(texts || {}).forEach(([l, map]) => {
+    if (!dict[l]) return;
+    Object.entries(map).forEach(([k, v]) => {
+      if (!(l + k in defaults)) defaults[l + k] = dict[l][k];
+      dict[l][k] = v;
+    });
+  });
+  const original = (l, k) => (l + k in defaults ? defaults[l + k] : dict[l][k]);
+  const keys = () => Object.keys(ru);
 
-  window.I18N = { t, apply, setLang, extend, get lang() { return lang; }, langs: ["ru", "en", "uk"] };
+  window.I18N = { t, apply, setLang, extend, override, original, keys, get lang() { return lang; }, langs: ["ru", "en", "uk"] };
 })();

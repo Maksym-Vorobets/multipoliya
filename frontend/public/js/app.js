@@ -88,15 +88,17 @@
     $("#val-real").textContent = ui.real;
     $('[data-stepper="total"] [data-step="-1"]').disabled = ui.total <= 2;
     $('[data-stepper="total"] [data-step="1"]').disabled = ui.total >= 4;
-    $('[data-stepper="real"] [data-step="-1"]').disabled = ui.real <= 1;
+    $('[data-stepper="real"] [data-step="-1"]').disabled = ui.real <= (ui.mode === "online" ? 2 : 1);
+    $("#btn-to-draw").textContent = ui.mode === "online" ? t("net.create") : t("setup.toDraw");
     $('[data-stepper="real"] [data-step="1"]').disabled = ui.real >= ui.total;
 
     $("#player-rows").innerHTML = Array.from({ length: ui.total }, (_, i) => {
       const isBot = i >= ui.real;
+      const remote = ui.mode === "online" && i > 0 && !isBot;
       const color = COLORS[i];
       const field = `<label class="p-field"><span class="p-dot c-${color}"></span>
         <input type="text" maxlength="16" data-name="${i}" value="${isBot ? esc(t(`color.${color}`)) : esc(ui.names[i])}"
-          placeholder="${esc(t(`color.${color}`))}" ${isBot ? "disabled" : ""} data-testid="player-name-input-${i}" /></label>`;
+          placeholder="${esc(remote ? t("net.waiting") : t(`color.${color}`))}" ${isBot || remote ? "disabled" : ""} data-testid="player-name-input-${i}" /></label>`;
       const select = isBot ? `<div class="select"><select data-bot="${i}" data-testid="bot-behavior-select-${i}">
           ${BOT_TYPES.map((b) => `<option value="${b}"${ui.bots[i] === b ? " selected" : ""}>${t(`bot.${b}`)}</option>`).join("")}
         </select></div>` : "";
@@ -185,6 +187,7 @@
     window.MPGame.attach(m);
     m.addEventListener("change", () => {
       if (ui.match !== m) return;
+      if (m.online) window.MPNet.push(m);
       if (ui.screen === "game") renderGame();
       window.MPGame.scheduleBot();
     });
@@ -253,8 +256,8 @@
     }
     if (el.id === "burger") return document.body.classList.toggle("menu-open");
     if (el.dataset.mode) {
-      if (el.dataset.mode === "online") return toast(t("setup.onlineSoon"));
       ui.mode = el.dataset.mode;
+      if (ui.mode === "online") ui.real = Math.max(2, ui.real);
       return renderSetup();
     }
     if (el.dataset.scn) {
@@ -265,9 +268,14 @@
       const key = el.closest("[data-stepper]").dataset.stepper;
       const step = +el.dataset.step;
       if (key === "total") ui.total = Math.min(4, Math.max(2, ui.total + step));
-      else ui.real = Math.min(ui.total, Math.max(1, ui.real + step));
+      else ui.real = Math.min(ui.total, Math.max(ui.mode === "online" ? 2 : 1, ui.real + step));
+      if (ui.mode === "online") ui.real = Math.max(2, Math.min(ui.real, ui.total));
       ui.real = Math.min(ui.real, ui.total);
       return renderPlayers();
+    }
+    if (el.id === "btn-to-draw" && ui.mode === "online") {
+      if (!ui.names[0].trim()) return toast(t("setup.nameRequired"), "error");
+      return window.MPNet.createRoom({ scenario: ui.scenario, total: ui.total, real: ui.real, bots: ui.bots, hostName: ui.names[0].trim() }).catch((err) => toast(err.message, "error"));
     }
     if (el.id === "btn-to-draw") {
       const missing = ui.names.slice(0, ui.real).some((n) => !n.trim());
@@ -309,6 +317,24 @@
   window.I18N.apply();
   document.dispatchEvent(new CustomEvent("langchange", { detail: window.I18N.lang }));
   go("start");
-  window.MPApp = { toast, renderGame, go };
+  // Replace local state with the room state received from the server
+  const applyRemote = (state) => {
+    const m = new Match(state);
+    m.online = true;
+    attach(m);
+    if (ui.screen !== "game" && ui.screen !== "results") go("game");
+    else if (ui.screen === "game") renderGame();
+    window.MPGame.scheduleBot();
+  };
+  // Host: draw order and start the online match
+  const startOnline = (room) => {
+    const s = SCENARIOS.find((x) => x.id === room.scenario);
+    const order = [...room.seats].map((st) => ({ st, roll: Math.random() })).sort((a, b) => b.roll - a.roll).map((x) => x.st);
+    const players = order.map((st) => ({ idx: st.idx, name: st.name || t(`color.${st.color}`), color: st.color, isBot: st.isBot, botType: st.botType }));
+    const m = Match.create({ scenario: s.id, currencies: s.currencies, players });
+    Match.clear();
+    return JSON.parse(JSON.stringify(m));
+  };
+  window.MPApp = { toast, renderGame, go, applyRemote, startOnline, esc };
   window.MP = { ui, go }; // debug hook
 })();
