@@ -85,25 +85,28 @@
 
   const groupCells = (gi, ring) => Object.values(cells).filter((c) => c.group === gi && c.ring === ring).map((c) => c.id);
 
-  // Route graph: forward along a ring; corners and stations allow switching rings (zigzag)
+  // Route graph: each step goes straight (next cell on the same ring) or sideways (other ring, same column).
+  // No backward or diagonal moves. From a corner the player may enter either ring.
   const next = (id) => {
     const c = cells[id];
     const np = (c.pos + 1) % 40;
-    if (CORNERS[np]) return [CORNERS[np]];
     if (c.kind === "corner") return [`${np}-1`, `${np}-2`];
-    const res = [`${np}-${c.ring}`];
-    if (c.kind === "station") res.push(`${np}-${c.ring === 1 ? 2 : 1}`);
-    return res;
+    const straight = CORNERS[np] || `${np}-${c.ring}`;
+    return [straight, `${c.pos}-${c.ring === 1 ? 2 : 1}`];
   };
 
+  // All destinations reachable in exactly `steps` steps; a cell can't be visited twice in one move
   const reachable = (from, steps) => {
     const results = new Map();
     const walk = (id, left, path) => {
       if (left === 0) {
-        if (!results.has(id)) results.set(id, path);
+        const prev = results.get(id);
+        if (!prev || path.length < prev.length) results.set(id, path);
         return;
       }
-      next(id).forEach((n) => walk(n, left - 1, [...path, n]));
+      next(id).forEach((n) => {
+        if (n !== from && !path.includes(n)) walk(n, left - 1, [...path, n]);
+      });
     };
     walk(from, steps, []);
     return [...results.entries()].map(([id, path]) => ({ id, path }));

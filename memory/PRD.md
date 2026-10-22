@@ -25,7 +25,7 @@ Build the browser PWA game «Мультиполия» from the spec (Техни�
 
 ## Assumptions to confirm with customer
 - Price list per color group (60…350 $, ring 12 = ×1.2), module cost, dome = 80% of module, rent multipliers 1/3.5/11.5/27.5/35/40
-- Route scheme: ring switch only via corners and stations
+- Route scheme (fixed per customer, 2026-06): each step = straight (next cell same ring) or sideways (other ring, same column); no backward/diagonal; no revisiting cells within one move; from corners either ring
 - Kvantal = pay 10% of balance, Icite = grant 50; Narmonyon = +1 g in Narmonia scenarios; Black Hole exit fine 50 (0.5 g)
 - Auction start = 50% of price; mortgage 50% / redeem 55%; sale to bank 75%
 
