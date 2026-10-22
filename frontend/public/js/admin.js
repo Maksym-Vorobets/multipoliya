@@ -54,7 +54,7 @@
     if (!logged) return;
     document.querySelectorAll("[data-adm-tab]").forEach((b) => b.classList.toggle("is-active", b.dataset.admTab === tab));
     $("#admin-search").hidden = tab !== "ui";
-    $("#admin-deck").hidden = tab !== "cards";
+    $("#admin-deck").parentElement.hidden = tab !== "cards";
     let html = "";
     if (tab === "rules") {
       html = `<p class="sub sub--xs">${esc(t("adm.html"))}</p>` + ["rules.title", "rules.body", "policy.title", "policy.body"].map((k) =>

@@ -226,7 +226,7 @@
           <div class="pl-bal" data-testid="player-balance-${p.color}">${t("game.balance")}: ${balances(p)}</div>
           ${p.isBot ? `<div class="pl-bot">${t(`bot.${p.botType}`)}</div>` : ""}
           ${p.status === "benefit" ? `<div class="pl-status" data-testid="player-status-${p.color}">${t("game.onBenefit")}</div>` : ""}</div>
-        ${i === m.active ? `<span class="pl-tag">${t("game.yourTurn")}</span>` : "<span></span>"}
+        ${i === m.active ? `<span class="pl-tag">${m.online && p.idx !== window.MPNet.session?.seat ? t("game.plays") : t("game.yourTurn")}</span>` : "<span></span>"}
       </li>`).join("");
     $("#center-title").textContent = `${cur.name} · ${window.MPBoard.name(cur.cell, window.I18N.lang)}`;
     $("#center-balance").textContent = `${t("game.yourBalance")}: ${balances(cur, " / ")}`;

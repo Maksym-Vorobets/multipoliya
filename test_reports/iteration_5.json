@@ -1,0 +1,54 @@
+{
+  "summary": "Iteration 5 tested admin JWT auth, editable content, online rooms API, and the UI for EN/UK cards, route preview, a 2-browser online match, the admin panel, and an offline bot regression. Backend: 11/11 pytest passed. Frontend: everything works except one CSS bug in the online lobby, which I fixed. `.stack{display:grid}` and `.btn{display:inline-flex}` overrode the [hidden] attribute, so the host saw the join form and guests saw the 'Начать партию' button. I added `[hidden]{display:none!important}` to base.css and re-verified. Brute-force lockout does not work behind ingress (see backend issues).",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/auth/login", "issue": "Brute-force lockout does not work in this deployment. The identifier is request.client.host + email, and request.client.host is the ingress pod IP, which changes between requests (seen: 10.81.4.212 and 10.81.4.213). Six wrong attempts in a row all returned 401 and none returned 429, because the counts were split 4 + 2 across two IPs. Fix: key on the first entry of the X-Forwarded-For header (fall back to client.host), or key on email only.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/rooms/{code}", "issue": "Returns the full game state and seat names to anyone who knows the code, with no X-Room-Token required. Acceptable for a game, but worth noting."},
+      {"endpoint": "POST /api/rooms/{code}/state", "issue": "Any joined seat can overwrite the whole state; there is no host-only or current-player check. A malicious guest could push an arbitrary state."},
+      {"endpoint": "rooms collection", "issue": "Rooms have no TTL or cleanup, so finished and abandoned rooms build up. Add a TTL index on created_at."},
+      {"endpoint": "CORS", "issue": "CORS_ORIGINS='*' with allow_credentials=True, so any Origin is reflected (checked with https://evil.com). Low risk because auth is a Bearer token and not a cookie, but explicit origins are recommended."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Lobby (screen-lobby)", "issue": "FIXED BY TESTER: hidden elements were still displayed because .stack and .btn display rules beat [hidden]. The host saw the join form (lobby-code-input, lobby-name-input, lobby-join-btn) above the room box, and guests saw lobby-start-btn. Added a global [hidden]{display:none!important} in css/base.css and verified both. This also makes start-continue-btn hide correctly.", "selector": "#lobby-join, #btn-lobby-start", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Game, online mode", "issues": ["The players list labels the current player 'Ваш ход' on every device, including the host's device while the guest is playing. For remote players it should say something like 'Ходит'.", "Move-option highlights (is-option cells) also show on the spectator's device during a remote player's turn. Probably harmless, but could confuse."]},
+      {"screen": "Admin panel", "issues": ["A stray 'v' dropdown chevron is visible at the right of the tab row on the Rules and UI tabs, where the deck select is hidden; it is likely a wrapper pseudo-element.", "Text in the textareas is low-contrast grey on dark navy and hard to read."]}
+    ]
+  },
+  "passed_flows": [
+    "Admin auth: login returns a token; wrong password gives 401; /auth/me works with a Bearer token and does not leak password_hash; PUT /admin/content gives 401 without a token; GET /api/content returns {texts,cards}. The password hash starts with $2b$.",
+    "Rooms: create returns code, token and seat 0; join fills the next human seat (lowercase code accepted); 409 when the room is full and after the game starts; start is host-only (403 for others) and returns 409 until everyone has joined; a stale version on /state gives 409; prompt create, answer (only the addressee, only once) and ack all work; phase=finished sets status=finished.",
+    "Cards: 108 cards in 6 decks, all with en and uk text. Landing on Chance 2-1 showed the full EN text ('Pay the school tax — $150.' / 'Apply') and the full UK text ('Сплатіть податок на бідність — $15.' / 'Виконати').",
+    "Route preview: hovering an is-option cell fills the #route polyline (dasharray 6px, colour rgb(79,182,227)); it clears on mouseout; after a click the selected cell keeps the line; it clears after the move is confirmed.",
+    "Online: setup enforces min real=2; only the host name is editable; the button reads 'Создать комнату'. The lobby shows code, invite link, seats and copy. A guest joining via ?room= link or by code appears on the host within about 2 s. Start stays disabled until all have joined. Both clients got the same turn order. Only the driver sees roll-dice-btn; the other sees remote-turn-indicator. The bot was played by the host. History and wallets matched on both devices.",
+    "Online prompts: when the guest declined a purchase, the auction prompt appeared on the host's device, the host bid 110, and the history and wallets synced. Guest pressing game-finish-btn gets the 'Подвести итоги может только хост' toast; bonus on someone else's turn gets the 'Бонус доступен только в ваш ход' toast. Guest and host both resume the game after a page reload (sessionStorage).",
+    "Admin UI: the wrong-password error is shown; tabs work; search filters keys (180 down to 1 key); the deck select lists 6 decks; editing start.newGame-ru and kap_chance-0-en then saving shows a toast, and after reload the start screen and MPCardData show the edited values. Reset followed by save restored the defaults (server content is now {texts:{},cards:{}}). Logout returns to the login form.",
+    "Offline regression: a 4-bot game ran 8 turns with no JS errors and made no /api/rooms calls."
+  ],
+  "test_report_links": ["/app/backend/tests/test_iter5_admin_rooms.py", "/app/test_reports/pytest/pytest_iter5.xml"],
+  "action_items": [
+    "Fix the login brute-force identifier: use the first X-Forwarded-For entry (or email only) instead of request.client.host, which changes per request behind ingress.",
+    "Online players list: show 'Ваш ход' only when the current player is the local seat; otherwise show something like 'Ходит'.",
+    "Admin panel: remove the stray chevron next to the tabs and improve textarea text contrast.",
+    "Optional hardening: restrict POST /rooms/{code}/state to the current player's seat or the host, and add a TTL index on rooms."
+  ],
+  "critical_code_review_comments": [
+    "net.js push(): on a 409 the pending state is silently dropped and not retried. The local state can diverge until the next poll overwrites it, which loses that local action. Consider re-fetching and re-applying, or at least logging.",
+    "net.js poll() skips applyRemote while a local dialog is busy. That is fine, but `version` is then not advanced, so the next push from that client sends a stale version, gets a 409, and is dropped (same issue as above).",
+    "server.py login: the lockout key depends on the client IP (see backend critical issue).",
+    "The global [hidden] override was missing; any future element using the hidden attribute together with .stack or .btn would have broken. Now fixed in base.css."
+  ],
+  "updated_files": ["/app/frontend/public/css/base.css", "/app/backend/tests/test_iter5_admin_rooms.py"],
+  "success_rate": {"backend": "100% functional (11/11 pytest); brute-force lockout broken behind ingress", "frontend": "~95% (one lobby visibility bug, fixed)"},
+  "test_credentials": "admin@multipolia.app / Multipolia2026! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Test rooms were created and deleted; admin content was edited and then restored to defaults via adm-reset-btn and adm-save-btn.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Two-player online tests work with page.context.browser.new_context() for the guest. Set total=2 via total-minus-btn in online mode; the host fills player-name-input-0; read the code from lobby-room-code and the link from lobby-invite-link. Whose turn it is: MP.ui.match.current.name. Purchase dialog buttons: dlg-btn-N with the text 'Отказаться (аукцион)' to trigger an auction; auction-bid-btn and auction-pass-btn appear on the remote device via the prompts API. Wallets: p.wallet {usd,rub,nar}. Admin save toast text is 'Изменения сохранены'. The adm-reset-btn may trigger a confirm(); accept the dialog."
+}

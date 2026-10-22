@@ -72,7 +72,9 @@ class LoginIn(BaseModel):
 @api.post("/auth/login")
 async def login(body: LoginIn, request: Request):
     email = body.email.strip().lower()
-    ident = f"{request.client.host if request.client else 'x'}:{email}"
+    fwd = request.headers.get("x-forwarded-for", "")
+    ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "x")
+    ident = f"{ip}:{email}"
     att = await db.login_attempts.find_one({"identifier": ident})
     if att and att.get("count", 0) >= 5 and att.get("until") and datetime.fromisoformat(att["until"]) > now():
         raise HTTPException(429, "Too many attempts. Try again in 15 minutes")
@@ -148,7 +150,7 @@ def public_room(room: dict, seat: Optional[int], since: int) -> dict:
 
 
 async def load_room(code: str) -> dict:
-    room = await db.rooms.find_one({"code": code.upper()}, {"_id": 0})
+    room = await db.rooms.find_one({"code": code.upper()}, {"_id": 0, "created_dt": 0})
     if not room:
         raise HTTPException(404, "Room not found")
     return room
@@ -183,7 +185,7 @@ async def create_room(body: RoomCreate):
             "name": body.hostName if i == 0 else None, "joined": i == 0 or not human,
             **({"token": token} if i == 0 else {}),
         })
-    room = {"code": code, "status": "lobby", "scenario": body.scenario, "version": 0, "seats": seats, "prompts": [], "created_at": now().isoformat()}
+    room = {"code": code, "status": "lobby", "scenario": body.scenario, "version": 0, "seats": seats, "prompts": [], "created_at": now().isoformat(), "created_dt": now()}
     await db.rooms.insert_one(room)
     return {"code": code, "token": token, "seat": 0, "room": public_room(room, 0, -1)}
 
@@ -282,6 +284,7 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
     await db.rooms.create_index("code", unique=True)
+    await db.rooms.create_index("created_dt", expireAfterSeconds=172800)
     email = os.environ["ADMIN_EMAIL"].lower()
     password = os.environ["ADMIN_PASSWORD"]
     existing = await db.users.find_one({"email": email})

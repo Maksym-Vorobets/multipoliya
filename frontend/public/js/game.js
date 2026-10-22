@@ -72,6 +72,7 @@
     "r.finish": ["Подвести итоги", "Підбити підсумки", "Show results"], "r.build": ["Строительство", "Будівництво", "Construction"], "r.life": ["Уровень жизни", "Рівень життя", "Living standard"],
     "r.capital": ["Капитал", "Капітал", "Capital"], "r.place": ["место", "місце", "place"], "r.winner": ["Победитель", "Переможець", "Winner"], "r.draw": ["Ничья", "Нічия", "Draw"],
     "r.title": ["Итоги партии", "Підсумки партії", "Match results"], "menu.home": ["Главный экран", "Головний екран", "Main screen"],
+    "game.plays": ["Ходит", "Ходить", "Playing"],
     "h.anomaly": ["Аномалия: {a} + {b} = {sum}", "Аномалія: {a} + {b} = {sum}", "Anomaly: {a} + {b} = {sum}"],
   });
 
@@ -177,7 +178,7 @@
     updateBoard();
   };
   const updateBoard = () => {
-    const opts = m.moveOptions ? m.moveOptions.map((o) => o.id) : [];
+    const opts = m.moveOptions && isLocalHuman(m.current) ? m.moveOptions.map((o) => o.id) : [];
     $$("#board .cell").forEach((el) => {
       const id = el.dataset.cell;
       const s = m.cells[id];
