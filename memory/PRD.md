@@ -41,3 +41,17 @@ Build the browser PWA game «Мультиполия» from the spec (Техни�
 ## Open questions
 - Starting sum for the «Капмония / Госмония» scenario (spec says «определяется отдельно»): 2000 ₽ is a placeholder for now
 - Prices / rent table per cell (needed for step 3–4)
+
+## 2026-06 — Session update
+- Narmonia shared (долевая) property: build by co-owner vote (>50% shares), costs + 33.3% premium split by share, 100% owner builds without vote; conversion vote shared→people with 100% Narmonit refund.
+- Rent selector (only built options, double only if whole group same people-type, pay in $ / нармонит), actions on current cell stay available after purchase; build only on own cell.
+- Layout: history in left column, fixed-height panels with internal scroll; selectable property rows + action bar (mortgage/redeem, sell, tender, collect).
+- 3D dice, Web Audio sounds with toggle, $→нармонит exchange (kap_nar), info panel follows highlighted cell.
+- Online: WebSocket /api/ws/rooms/{code} live sync (auto-reconnect, polling fallback, falls back to polling-only if WS unsupported), «Вернуться в партию» (start screen + connection banner), server accepts state only from current-turn seat or host (403), seat-set change 422.
+- Vercel: /vercel.json services (backend fastapi server:app on /api/*, frontend CRA on /*), no bindings; MP_API falls back to same-origin /api.
+- Testing: iteration_6 passed all features except offline banner; fixes applied (pong timeout, offline drop, modal pointer-events, labels, plural, layout) — RETEST PENDING.
+
+## Backlog
+- P1: retest iteration_6 fixes; split game.js (>1000 lines)
+- P1: smarter bot personalities; full localization audit
+- P2: real ad SDK (currently MOCKED), leaderboards

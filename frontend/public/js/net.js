@@ -36,6 +36,8 @@
   let lostTimer = null;
   let deferred = null;
   let lastPong = 0;
+  let wsEver = false; // the host may not support WebSockets (e.g. serverless) → polling only
+  let wsFails = 0;
   let tick = 0;
   const handled = new Set();
   const waiters = {};
@@ -130,6 +132,7 @@
     ws = sock;
     sock.onopen = () => {
       wsOpen = true;
+      wsEver = true;
       retry = 0;
       lastPong = Date.now();
       setLost(false);
@@ -145,7 +148,8 @@
       ws = null;
       if (ev.code === 4403) return leave();
       if (!session) return;
-      setLost(true);
+      if (!wsEver && ++wsFails >= 3) return; // no WebSocket support: stay on REST polling
+      if (wsEver) setLost(true);
       retryTimer = setTimeout(connect, Math.min(8000, 1000 * 2 ** retry++));
     };
   };

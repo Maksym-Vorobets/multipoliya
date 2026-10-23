@@ -277,7 +277,10 @@
 
   <div class="toasts" id="toasts" data-testid="toasts"></div>
 
-  <script>window.MP_API = "%REACT_APP_BACKEND_URL%" + "/api";</script>
+  <script>
+    // Same-origin "/api" when REACT_APP_BACKEND_URL is not set (e.g. Vercel services on one domain)
+    (function (b) { window.MP_API = (b.indexOf("%") === 0 ? "" : b.replace(/\/$/, "")) + "/api"; })("%REACT_APP_BACKEND_URL%");
+  </script>
   <script src="/js/i18n.js"></script>
   <script src="/js/prices.js"></script>
   <script src="/js/board.js"></script>
