@@ -120,7 +120,9 @@ class TestRooms:
         # join after start -> 409
         assert s.post(f"{BASE_URL}/api/rooms/{code}/join", json={"name": "TEST_Late"}).status_code == 409
         # state push
-        r = s.post(f"{BASE_URL}/api/rooms/{code}/state", json={"version": 1, "state": {"phase": "await_roll", "n": 2}}, headers=G)
+        # iter6: guest is not on turn (no players in state) -> 403; host may push
+        assert s.post(f"{BASE_URL}/api/rooms/{code}/state", json={"version": 1, "state": {"n": 2}}, headers=G).status_code == 403
+        r = s.post(f"{BASE_URL}/api/rooms/{code}/state", json={"version": 1, "state": {"phase": "await_roll", "n": 2}}, headers=H)
         assert r.status_code == 200 and r.json()["version"] == 2
         r = s.post(f"{BASE_URL}/api/rooms/{code}/state", json={"version": 1, "state": {"n": 3}}, headers=H)
         assert r.status_code == 409

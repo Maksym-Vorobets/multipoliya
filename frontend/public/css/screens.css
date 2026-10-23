@@ -81,7 +81,8 @@
   .screen-game.is-active { height: calc(100vh - var(--header-h)); min-height: 560px; overflow: hidden; }
   .g-left, .g-right { display: flex; flex-direction: column; min-height: 0; }
   .g-left > .panel, .g-right > .panel { flex: none; }
-  .g-left > .history { flex: 1 1 0; min-height: 120px; }
+  .g-left > .history { flex: 1 1 0; min-height: 150px; }
+  .g-left > .turn-order { flex: 0 1 auto; min-height: 0; overflow: auto; }
   .g-left .history-list { flex: 1; min-height: 0; max-height: none; }
   .g-right > .sector-info { max-height: 46%; overflow: auto; }
   .g-right > .props { flex: 1 1 0; min-height: 160px; display: flex; flex-direction: column; }

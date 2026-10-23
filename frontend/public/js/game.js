@@ -93,6 +93,7 @@
     "h.premiumShare": ["Премия за строительство {cell} → {to}:", "Премія за будівництво {cell} → {to}:", "Construction premium {cell} → {to}:"],
     "h.convertRefund": ["Возврат вложений {cell} (перевод в народную):", "Повернення вкладень {cell} (переведення в народну):", "Investment refund {cell} (converted to people's):"],
     "h.converted": ["{cell} переведена в народную собственность", "{cell} переведено в народну власність", "{cell} converted to people's property"],
+    "snd.turnOff": ["Выключить звук", "Вимкнути звук", "Turn sound off"], "snd.turnOn": ["Включить звук", "Увімкнути звук", "Turn sound on"],
     "snd.on": ["Звук включён", "Звук увімкнено", "Sound on"], "snd.off": ["Звук выключен", "Звук вимкнено", "Sound off"],
   });
 
@@ -205,7 +206,7 @@
       if (el) drawRoute(el.dataset.cell);
     });
     board.addEventListener("mouseout", (e) => e.target.closest(".cell.is-option") && drawRoute(selected));
-    new ResizeObserver(() => placeTokens()).observe(board);
+    new ResizeObserver(() => (placeTokens(), drawRoute(selected))).observe(board);
     updateBoard();
   };
   const updateBoard = () => {
@@ -543,7 +544,7 @@
     const cost = E.buildCost(m, id, a.kind);
     const kind = `${t("g.subjBuild")}: ${E.L(a.kind)}`;
     if (a.id === "publicModule") return { title: kind, rows: () => [[t("g.source"), t("g.bank")], [t("g.price"), fmt(cost, unit)]] };
-    const plan = E.sharedPlan(m, id, a.kind);
+    const plan = E.sharedPlan(m, id, a.kind, m.current);
     return {
       title: kind,
       rows: (p) => [[t("g.source"), t("g.coOwners")], [t("g.price"), fmt(cost, unit)], [t("g.yourPart"), fmt((plan.find((x) => x.pl === p) || { part: 0 }).part, unit)], [t("g.premium"), fmt((cost * E.SP.buildPremiumPercent) / 100, unit)]],
@@ -727,7 +728,7 @@
     const v = await dialog({ title: t("game.menu"), buttons: [
       { label: t("game.finish"), value: "finish", testid: "menu-finish-btn" }, { label: t("game.bonus"), value: "bonus", testid: "menu-bonus-btn" },
       ...(m.scenario === "kap_nar" ? [{ label: t("g.exchange"), value: "exchange", testid: "menu-exchange-btn" }] : []),
-      { label: window.MPSound.on ? t("snd.off") + " ✕" : t("snd.on"), value: "sound", testid: "menu-sound-btn" },
+      { label: t(window.MPSound.on ? "snd.turnOff" : "snd.turnOn"), value: "sound", testid: "menu-sound-btn" },
       { label: t("nav.rules"), value: "rules", testid: "menu-rules-btn" }, { label: t("menu.home"), value: "home", testid: "menu-home-btn" },
       { label: t("g.back"), value: null, primary: true, testid: "menu-back-btn" }] });
     if (v === "exchange") return myTurn(m.current) ? exchange(m.current) : window.MPApp.toast(t("net.yourTurnOnly"), "error");

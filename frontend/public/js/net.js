@@ -35,6 +35,8 @@
   let retryTimer = null;
   let lostTimer = null;
   let deferred = null;
+  let lastPong = 0;
+  let tick = 0;
   const handled = new Set();
   const waiters = {};
 
@@ -92,14 +94,29 @@
       if (!wsOpen) setLost(!navigator.onLine);
     } catch (e) {
       if (e.status === 404 || e.status === 403) return leave();
+      dropSocket();
       setLost(true);
     }
   };
-  const setLost = (lost) => {
+  // Banner «connection lost» with the «Return to match» button
+  let lost = false;
+  const setLost = (v) => {
+    lost = v;
     clearTimeout(lostTimer);
     const banner = $("#net-banner");
-    if (!lost) return (banner.hidden = true);
-    lostTimer = setTimeout(() => (banner.hidden = !session || wsOpen), 2500);
+    if (!v) return (banner.hidden = true);
+    lostTimer = setTimeout(() => (banner.hidden = !session || !lost), 2500);
+  };
+  // Force-close a socket that is silently dead (no pong / browser offline) so it reconnects
+  const dropSocket = () => {
+    if (!ws) return;
+    const sock = ws;
+    sock.onclose = null;
+    sock.close();
+    ws = null;
+    wsOpen = false;
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(connect, Math.min(8000, 1000 * 2 ** retry++));
   };
   const connect = () => {
     if (!session) return;
@@ -114,9 +131,11 @@
     sock.onopen = () => {
       wsOpen = true;
       retry = 0;
+      lastPong = Date.now();
       setLost(false);
     };
     sock.onmessage = (ev) => {
+      lastPong = Date.now();
       const data = JSON.parse(ev.data);
       if (data.type === "room") handle(data);
     };
@@ -132,7 +151,16 @@
   };
   const startSync = () => {
     clearInterval(timer);
-    timer = setInterval(() => (wsOpen ? ws.send("ping") : null, poll()), 4000);
+    // WS: ping every 3 s, dead after 9 s without any message; REST poll only as a fallback / every 5th tick
+    timer = setInterval(() => {
+      tick += 1;
+      if (wsOpen && Date.now() - lastPong > 9000) {
+        dropSocket();
+        setLost(true);
+      }
+      if (wsOpen) ws.send("ping");
+      if (!wsOpen || tick % 5 === 0) poll();
+    }, 3000);
     connect();
     poll();
   };
@@ -149,7 +177,11 @@
     retry = 0;
     startSync();
   };
-  window.addEventListener("offline", () => session && setLost(true));
+  window.addEventListener("offline", () => {
+    if (!session) return;
+    dropSocket();
+    setLost(true);
+  });
   window.addEventListener("online", () => session && (retry = 0, connect(), poll()));
 
   // Push the full match state after every local change (versioned; server accepts only the current player or host)

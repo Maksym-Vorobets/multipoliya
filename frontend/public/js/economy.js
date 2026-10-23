@@ -13,7 +13,7 @@
     publicBuild: ["Голосовать (купить для всех)", "Голосувати (купити для всіх)", "Vote (buy for everyone)"],
     publicModule: ["Голосовать (модуль за счёт банка)", "Голосувати (модуль коштом банку)", "Vote (module funded by bank)"],
     rentTariff: ["Аренда", "Оренда", "Rent"], rentDoubleT: ["Двойная аренда", "Подвійна оренда", "Double rent"],
-    rentMods: ["Аренда {n} модулей", "Оренда {n} модулів", "Rent {n} modules"], rentDome: ["Аренда купола", "Оренда купола", "Dome rent"],
+    rentMods: ["Аренда {n} модулей", "Оренда {n} модулів", "Rent {n} modules"], rentMod1: ["Аренда 1 модуля", "Оренда 1 модуля", "Rent 1 module"], rentDome: ["Аренда купола", "Оренда купола", "Dome rent"],
     m_kap: ["Капмония", "Капмонія", "Kapmonia"], m_gos: ["Госмония", "Госмонія", "Gosmonia"], m_nar: ["Нармония", "Нармонія", "Narmonia"],
     s_free: ["Свободный сектор", "Вільний сектор", "Free sector"], s_private: ["Частная собственность", "Приватна власність", "Private property"],
     s_people: ["Народная собственность", "Народна власність", "People's property"], s_state: ["Государственный объект", "Державний об'єкт", "State object"],
@@ -193,7 +193,7 @@
         add({ id: "jointBuy", label: L("jointBuy") });
         if (!did("publicBuild")) add({ id: "publicBuild", label: L("publicBuild") });
       } else {
-        if (due) tariffs(m, id).forEach((r, i) => add({ id: "narRent", rent: true, tariff: i, key: r.key, n: r.n, fiat: r.fiat, label: L(r.key, { n: r.n }), opts: payOpts(m, r.fiat), mandatory: true }));
+        if (due) tariffs(m, id).forEach((r, i) => add({ id: "narRent", rent: true, tariff: i, key: r.key, n: r.n, fiat: r.fiat, label: L(r.n === 1 ? "rentMod1" : r.key, { n: r.n }), opts: payOpts(m, r.fiat), mandatory: true }));
         const kind = c.build && !s.dome && !improveBlocked(m, id) ? (s.modules < 4 ? "module" : domeAllowed(m, p, id, "nar") ? "dome" : null) : null;
         if (kind && s.type === "shared" && owner === p.id) add({ id: kind, label: L(kind), opts: payOpts(m, buildCost(m, id, kind)), mandatory: due });
         else if (kind && s.type === "shared" && !did("sharedBuild")) add({ id: "sharedBuild", kind, label: `${L(kind)} · ${L("sharedVote")}`, mandatory: due });
@@ -370,19 +370,23 @@
     if (kind) markImproved(m, id, initiator);
   };
 
-  // Shared property: co-owners pay by shares, initiator gets the premium from them by shares
-  const sharedPlan = (m, id, kind) => {
+  // Each co-owner: share of the cost + share of the initiator's premium (own premium share is paid to yourself)
+  const sharedPlan = (m, id, kind, initiator) => {
     const cost = buildCost(m, id, kind);
+    const premium = (cost * SP.buildPremiumPercent) / 100;
     return Object.entries(st(m, id).owners).map(([pid, share]) => {
       const pl = m.player(pid);
-      const part = r2(cost * share);
-      return { pl, share, part, opt: payOpts(m, part).find((o) => pl.wallet.has(o.cur, o.amount)) };
+      const part = Math.round(cost * share);
+      const prem = pl === initiator ? 0 : Math.round(premium * share);
+      const cur = payOpts(m, part + prem).find((o) => pl.wallet.has(o.cur, o.amount));
+      const conv = (x) => (cur && cur.cur === "nar" ? m.bank.usdToNar(x) : x);
+      return { pl, share, part, prem, opt: cur && { cur: cur.cur, amount: conv(part) }, premOpt: cur && { cur: cur.cur, amount: conv(prem) } };
     });
   };
   const sharedBuild = (m, id, initiator, kind) => {
     const s = st(m, id);
     const name = "#" + id;
-    const plan = sharedPlan(m, id, kind);
+    const plan = sharedPlan(m, id, kind, initiator);
     if (plan.some((x) => !x.opt)) {
       m.log({ key: "h.sharedNoFunds", playerId: initiator.id, params: { cell: name } });
       return false;
@@ -391,9 +395,7 @@
     plan.forEach((x) => {
       pay(m, x.pl, x.opt, "h.sharedPart", { cell: name });
       x.pl.stats.build += fiatOf(m, x.opt);
-      if (x.pl === initiator) return; // own share of the premium is paid to yourself
-      const opt = payOpts(m, r2(premium * x.share)).find((o) => x.pl.wallet.has(o.cur, o.amount));
-      if (opt && opt.amount > 0) m.transfer(x.pl, initiator, opt.cur, opt.amount, "h.premiumShare", { cell: name });
+      if (x.premOpt.amount > 0) m.transfer(x.pl, initiator, x.premOpt.cur, x.premOpt.amount, "h.premiumShare", { cell: name });
     });
     initiator.stats.build += premium;
     if (kind === "dome") s.dome = true;
