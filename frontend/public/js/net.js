@@ -17,14 +17,24 @@
     "net.waitTurn": ["Ход игрока {name}…", "Хід гравця {name}…", "{name} is playing…"], "net.hostOnly": ["Подвести итоги может только хост", "Підбити підсумки може лише хост", "Only the host can finish"],
     "net.yourTurnOnly": ["Бонус доступен только в ваш ход", "Бонус доступний лише у ваш хід", "Bonus is available on your turn only"],
     "net.notFull": ["Ещё не все игроки присоединились", "Ще не всі гравці приєдналися", "Not all players have joined"], "net.codePh": ["Код, например K7QX2M", "Код, наприклад K7QX2M", "Code, e.g. K7QX2M"],
+    "net.rejoin": ["Вернуться в партию", "Повернутися до партії", "Return to match"], "net.lost": ["Соединение потеряно — переподключаемся…", "З'єднання втрачено — перепідключаємося…", "Connection lost — reconnecting…"],
+    "game.tabProps": ["Объекты", "Об'єкти", "Objects"],
   });
 
+  // Tab session (survives reload) + last session in localStorage for «Return to match» after closing the tab
+  const LAST = "mp.net.last";
   let session = JSON.parse(sessionStorage.getItem("mp.net") || "null"); // { code, token, seat }
   let room = null;
   let version = 0;
   let timer = null;
   let pushing = false;
   let pending = null;
+  let ws = null;
+  let wsOpen = false;
+  let retry = 0;
+  let retryTimer = null;
+  let lostTimer = null;
+  let deferred = null;
   const handled = new Set();
   const waiters = {};
 
@@ -40,42 +50,109 @@
   };
   const setSession = (s) => {
     session = s;
-    s ? sessionStorage.setItem("mp.net", JSON.stringify(s)) : sessionStorage.removeItem("mp.net");
+    if (s) {
+      sessionStorage.setItem("mp.net", JSON.stringify(s));
+      localStorage.setItem(LAST, JSON.stringify(s));
+    } else {
+      sessionStorage.removeItem("mp.net");
+      localStorage.removeItem(LAST);
+    }
   };
 
-  /* ----- polling: lobby, state sync, prompts ----- */
-  const poll = async () => {
-    if (!session) return;
-    try {
-      const data = await req("GET", `/rooms/${session.code}?since=${version}`);
-      room = data;
-      if (data.status === "lobby") renderLobby();
-      if (data.state && data.version > version && !pushing && !pending && !window.MPGame.busy) {
+  /* ----- room updates (WebSocket push, polling as a safety net) ----- */
+  const handle = (data) => {
+    room = data;
+    if (data.status === "lobby") renderLobby();
+    if (data.state && data.version > version) {
+      if (pushing || pending || window.MPGame.busy) {
+        deferred = data; // apply after the local animation / push finishes
+        setTimeout(() => deferred === data && handle(data), 250);
+      } else {
+        deferred = null;
         version = data.version;
         window.MPApp.applyRemote(data.state);
       }
-      data.prompts.forEach((p) => {
-        if (handled.has(p.id)) return;
-        handled.add(p.id);
-        window.MPGame.promptLocal(p.spec).then((value) => req("POST", `/rooms/${session.code}/prompts/${p.id}/answer`, { value: value ?? null }));
-      });
-      data.answers.forEach((a) => {
-        if (!waiters[a.id]) return;
-        waiters[a.id](a.value);
-        delete waiters[a.id];
-        req("POST", `/rooms/${session.code}/prompts/${a.id}/ack`);
-      });
+    }
+    (data.prompts || []).forEach((p) => {
+      if (handled.has(p.id)) return;
+      handled.add(p.id);
+      window.MPGame.promptLocal(p.spec).then((value) => req("POST", `/rooms/${session.code}/prompts/${p.id}/answer`, { value: value ?? null }));
+    });
+    (data.answers || []).forEach((a) => {
+      if (!waiters[a.id]) return;
+      waiters[a.id](a.value);
+      delete waiters[a.id];
+      req("POST", `/rooms/${session.code}/prompts/${a.id}/ack`);
+    });
+  };
+  const poll = async () => {
+    if (!session) return;
+    try {
+      handle(await req("GET", `/rooms/${session.code}?since=${version}`));
+      if (!wsOpen) setLost(!navigator.onLine);
     } catch (e) {
-      if (e.status === 404 || e.status === 403) leave();
+      if (e.status === 404 || e.status === 403) return leave();
+      setLost(true);
     }
   };
-  const startPolling = () => {
+  const setLost = (lost) => {
+    clearTimeout(lostTimer);
+    const banner = $("#net-banner");
+    if (!lost) return (banner.hidden = true);
+    lostTimer = setTimeout(() => (banner.hidden = !session || wsOpen), 2500);
+  };
+  const connect = () => {
+    if (!session) return;
+    clearTimeout(retryTimer);
+    if (ws) {
+      ws.onclose = null;
+      ws.close();
+    }
+    const url = `${API.replace(/^http/, "ws")}/ws/rooms/${session.code}?token=${encodeURIComponent(session.token)}`;
+    const sock = new WebSocket(url);
+    ws = sock;
+    sock.onopen = () => {
+      wsOpen = true;
+      retry = 0;
+      setLost(false);
+    };
+    sock.onmessage = (ev) => {
+      const data = JSON.parse(ev.data);
+      if (data.type === "room") handle(data);
+    };
+    sock.onclose = (ev) => {
+      if (ws !== sock) return;
+      wsOpen = false;
+      ws = null;
+      if (ev.code === 4403) return leave();
+      if (!session) return;
+      setLost(true);
+      retryTimer = setTimeout(connect, Math.min(8000, 1000 * 2 ** retry++));
+    };
+  };
+  const startSync = () => {
     clearInterval(timer);
-    timer = setInterval(poll, 1200);
+    timer = setInterval(() => (wsOpen ? ws.send("ping") : null, poll()), 4000);
+    connect();
     poll();
   };
+  // «Return to match»: reconnect and pull the full current state from the server
+  const rejoin = () => {
+    if (!session) {
+      const last = JSON.parse(localStorage.getItem(LAST) || "null");
+      if (!last) return;
+      setSession(last);
+    }
+    version = 0;
+    if (document.body.dataset.screen !== "game") window.MPApp.go("lobby");
+    renderLobby();
+    retry = 0;
+    startSync();
+  };
+  window.addEventListener("offline", () => session && setLost(true));
+  window.addEventListener("online", () => session && (retry = 0, connect(), poll()));
 
-  // Push the full match state after every local change (debounced, versioned)
+  // Push the full match state after every local change (versioned; server accepts only the current player or host)
   const push = (m) => {
     pending = m;
     if (pushing) return;
@@ -87,11 +164,13 @@
         try {
           version = (await req("POST", `/rooms/${session.code}/state`, { version, state })).version;
         } catch (e) {
-          if (e.status !== 409) window.MPApp.toast(e.message, "error");
+          if (e.status === 409 || e.status === 403) version = 0; // out of sync: take the server state
+          else window.MPApp.toast(e.message, "error");
         }
       }
       pushing = false;
-    }, 150);
+      if (version === 0) poll();
+    }, 30);
   };
 
   const prompt = async (seat, spec) => {
@@ -110,7 +189,7 @@
     version = 0;
     window.MPApp.go("lobby");
     renderLobby();
-    startPolling();
+    startSync();
   };
   const join = async (code, name) => {
     const data = await req("POST", `/rooms/${code.toUpperCase()}/join`, { name });
@@ -118,7 +197,7 @@
     room = data.room;
     version = 0;
     renderLobby();
-    startPolling();
+    startSync();
   };
   const start = async () => {
     if (room.seats.some((s) => !s.joined)) return window.MPApp.toast(t("net.notFull"), "error");
@@ -128,6 +207,14 @@
   };
   const leave = () => {
     clearInterval(timer);
+    clearTimeout(retryTimer);
+    if (ws) {
+      ws.onclose = null;
+      ws.close();
+      ws = null;
+    }
+    wsOpen = false;
+    $("#net-banner").hidden = true;
     setSession(null);
     room = null;
     history.replaceState(null, "", location.pathname);
@@ -172,21 +259,44 @@
     }
     if (b.id === "btn-lobby-start") start().catch((err) => window.MPApp.toast(err.message, "error"));
     if (b.id === "btn-lobby-leave") leave();
+    if (b.id === "btn-rejoin" || b.id === "btn-net-rejoin") rejoin();
     if (b.id === "btn-lobby-copy") navigator.clipboard?.writeText(link()).then(() => window.MPApp.toast(t("net.copied")), () => $("#lobby-link").select());
   });
   document.addEventListener("langchange", () => document.body.dataset.screen === "lobby" && renderLobby());
 
-  window.MPNet = { get session() { return session; }, createRoom, prompt, push, leave, renderLobby };
+  // Start screen: offer to return to an unfinished online match (tab closed / connection lost)
+  const renderRejoin = () => {
+    const btn = $("#btn-rejoin");
+    const last = session || JSON.parse(localStorage.getItem(LAST) || "null");
+    btn.hidden = !last;
+  };
+  window.MPNet = { get session() { return session; }, createRoom, prompt, push, leave, renderLobby, renderRejoin, rejoin };
 
-  // Entry: invite link (?room=CODE) or resumed session after reload
+  // Entry: invite link (?room=CODE), reload of the same tab, or a match left in another tab
   const code = new URLSearchParams(location.search).get("room");
+  const last = JSON.parse(localStorage.getItem(LAST) || "null");
   if (session && (!code || code.toUpperCase() === session.code)) {
     window.MPApp.go("lobby");
     renderLobby();
-    startPolling();
-  } else if (code) {
-    setSession(null);
+    startSync();
+  } else if (code && !(last && last.code === code.toUpperCase())) {
+    sessionStorage.removeItem("mp.net");
+    session = null;
     window.MPApp.go("lobby");
     renderLobby();
+  } else if (last) {
+    // verify the room still exists and the seat is still ours before offering the button
+    fetch(`${API}/rooms/${last.code}`, { headers: { "X-Room-Token": last.token } })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((d) => {
+        if (d.status === "finished") throw new Error("finished");
+        room = d;
+        renderRejoin();
+        if (code) rejoin();
+      })
+      .catch(() => {
+        localStorage.removeItem(LAST);
+        renderRejoin();
+      });
   }
 })();

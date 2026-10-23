@@ -123,7 +123,7 @@
       return m;
     }
 
-    static freshTurn() { return { stage: "pre", acted: { pre: false, post: false }, bought: [], improved: [], due: null, declined: null }; }
+    static freshTurn() { return { stage: "pre", done: [], bought: [], improved: [], due: null, declined: null }; }
 
     get rules() { return SCENARIO_RULES[this.scenario]; }
     get current() { return this.players[this.active]; }

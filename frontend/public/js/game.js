@@ -74,12 +74,43 @@
     "r.title": ["Итоги партии", "Підсумки партії", "Match results"], "menu.home": ["Главный экран", "Головний екран", "Main screen"],
     "game.plays": ["Ходит", "Ходить", "Playing"],
     "h.anomaly": ["Аномалия: {a} + {b} = {sum}", "Аномалія: {a} + {b} = {sum}", "Anomaly: {a} + {b} = {sum}"],
+    "g.rentChoose": ["Выберите вид аренды", "Оберіть вид оренди", "Choose the rent type"], "g.rentSum": ["Сумма аренды", "Сума оренди", "Rent amount"],
+    "g.pay.usd": ["Оплатить в долларах", "Сплатити в доларах", "Pay in dollars"], "g.pay.nar": ["Оплатить в нармоните", "Сплатити в нармоніті", "Pay in Narmonit"], "g.pay.rub": ["Оплатить в рублях", "Сплатити в рублях", "Pay in roubles"],
+    "g.otherActs": ["Другие действия", "Інші дії", "Other actions"], "g.weight": ["Доля голоса", "Частка голосу", "Vote weight"],
+    "g.coOwners": ["Средства долевиков", "Кошти пайовиків", "Co-owners' funds"], "g.yourPart": ["Ваша часть", "Ваша частина", "Your part"],
+    "g.convert": ["Голосование: перевести в народную", "Голосування: перевести в народну", "Vote: convert to people's property"],
+    "g.convertTitle": ["Перевод в народную собственность", "Переведення в народну власність", "Conversion to people's property"],
+    "g.refund": ["Возврат вам от банка", "Повернення вам від банку", "Bank refund to you"], "g.subjBuy": ["Покупка за счёт банка", "Купівля коштом банку", "Purchase funded by bank"],
+    "g.subjBuild": ["Строительство", "Будівництво", "Construction"], "g.premium": ["Премия инициатору", "Премія ініціатору", "Initiator premium"],
+    "g.mortgageBtn": ["Заложить", "Закласти", "Mortgage"], "g.redeem": ["Выкупить", "Викупити", "Redeem"], "g.sellBank": ["Продать банку", "Продати банку", "Sell to bank"],
+    "g.selected": ["Выбрано", "Обрано", "Selected"], "g.selectProp": ["Выберите объект в списке", "Оберіть об'єкт у списку", "Select an object in the list"],
+    "g.sellConfirm": ["Продать объект банку?", "Продати об'єкт банку?", "Sell the object to the bank?"], "g.youGet": ["Вы получите", "Ви отримаєте", "You get"],
+    "g.ownTurnOnly": ["Управлять объектами можно только в свой ход", "Керувати об'єктами можна лише у свій хід", "Manage objects on your turn only"],
+    "g.exchange": ["Обмен $ → нармонит", "Обмін $ → нармоніт", "Exchange $ → Narmonit"], "g.rate": ["Курс (цена золота)", "Курс (ціна золота)", "Rate (gold price)"],
+    "g.exchangeDo": ["Обменять", "Обміняти", "Exchange"], "h.exchange": ["Обмен валют по цене золота:", "Обмін валют за ціною золота:", "Currency exchange at gold price:"],
+    "h.sharedPart": ["Доля в строительстве {cell}:", "Частка в будівництві {cell}:", "Construction share {cell}:"],
+    "h.sharedNoFunds": ["Строительство {cell} отменено: у долевиков не хватает средств", "Будівництво {cell} скасовано: пайовикам бракує коштів", "Construction {cell} cancelled: co-owners lack funds"],
+    "h.premiumShare": ["Премия за строительство {cell} → {to}:", "Премія за будівництво {cell} → {to}:", "Construction premium {cell} → {to}:"],
+    "h.convertRefund": ["Возврат вложений {cell} (перевод в народную):", "Повернення вкладень {cell} (переведення в народну):", "Investment refund {cell} (converted to people's):"],
+    "h.converted": ["{cell} переведена в народную собственность", "{cell} переведено в народну власність", "{cell} converted to people's property"],
+    "snd.on": ["Звук включён", "Звук увімкнено", "Sound on"], "snd.off": ["Звук выключен", "Звук вимкнено", "Sound off"],
   });
 
   let m = null;
   let selected = null; // destination chosen, awaiting confirm
   let busy = false; // animation / dialog in progress
   let panelPlayer = null;
+  let inspect = null; // cell clicked for info outside of move selection
+  let inspectKey = "";
+  let propSel = null; // object selected in the property panel
+  const unitCur = () => (m.scenario === "nar_nar" ? "usd" : E.fiatCur(m));
+  // The highlighted cell is the one whose info is shown
+  const shownCell = () => {
+    const key = `${m.turnNo}:${m.phase}`;
+    if (key !== inspectKey) (inspectKey = key), (inspect = null);
+    return (m.phase === "await_move" ? selected : inspect) || m.current.cell;
+  };
+  const myTurn = (p) => !!p && m.current === p && isLocalHuman(p) && !busy && m.phase !== "finished";
   const animating = new Set();
   const nm = (id) => B.name(id, lang());
   const net = () => (m && m.online && window.MPNet.session) || null;
@@ -179,11 +210,12 @@
   };
   const updateBoard = () => {
     const opts = m.moveOptions && isLocalHuman(m.current) ? m.moveOptions.map((o) => o.id) : [];
+    const shown = shownCell();
     $$("#board .cell").forEach((el) => {
       const id = el.dataset.cell;
       const s = m.cells[id];
       el.classList.toggle("is-option", opts.includes(id));
-      el.classList.toggle("is-selected", selected === id);
+      el.classList.toggle("is-selected", shown === id);
       el.classList.toggle("is-current", m.current.cell === id);
       const marks = $(".cell-marks", el);
       if (!s || !marks) return;
@@ -256,9 +288,63 @@
     for (const id of path) {
       const { x, y } = tokenXY(p, id);
       if (tk) tk.style.transform = `translate(${x}px, ${y}px) translate(-50%, -80%)`;
+      window.MPSound.play("step");
       await wait(230);
     }
     animating.delete(p.id);
+  };
+
+  /* ================= 3D dice ================= */
+  const PIPS = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
+  const FACE_ROT = { 1: [0, 0], 2: [0, -90], 3: [-90, 0], 4: [90, 0], 5: [0, 90], 6: [0, 180] };
+  const spins = [0, 0];
+  let diceKey = "";
+  const buildDice = () => {
+    const box = $("#dice");
+    if (box.dataset.built === "1") return;
+    box.dataset.built = "1";
+    const face = (n) => `<div class="face face-${n}">${Array.from({ length: 9 }, (_, i) => `<i${PIPS[n].includes(i + 1) ? ' class="on"' : ""}></i>`).join("")}</div>`;
+    box.innerHTML = [0, 1].map((i) => `<div class="die3d" data-testid="die-${i}"><div class="cube">${[1, 2, 3, 4, 5, 6].map(face).join("")}</div></div>`).join("");
+  };
+  // Tumble the cubes and land them face-on showing a / b
+  const showDice = (a, b, spin) => {
+    buildDice();
+    $$("#dice .die3d").forEach((d, i) => {
+      const v = i ? b : a;
+      const [x, y] = FACE_ROT[v];
+      const cube = $(".cube", d);
+      if (spin) spins[i] += 1;
+      const k = spins[i] * 360;
+      cube.style.transition = spin ? "transform 1100ms cubic-bezier(0.17, 0.67, 0.3, 1)" : "none";
+      cube.style.transform = `rotateZ(${k * (i ? -1 : 1)}deg) rotateX(${x + 2 * k}deg) rotateY(${y + k * (i ? 1 : -1)}deg)`;
+      d.dataset.face = v;
+      if (spin) {
+        d.classList.remove("is-rolling");
+        void d.offsetWidth;
+        d.classList.add("is-rolling");
+      }
+    });
+    if (spin) window.MPSound.play("dice");
+  };
+  const setDice = (r) => {
+    if (!r) {
+      buildDice();
+      if (!diceKey.startsWith(m.id + ":")) diceKey = m.id + ":none";
+      return;
+    }
+    const key = `${m.id}:${m.turnNo}:${r.a}:${r.b}`;
+    if (key === diceKey) return;
+    const spin = diceKey.startsWith(m.id + ":"); // no spin on the first render of a match
+    diceKey = key;
+    showDice(r.a, r.b, spin);
+  };
+  const rollAnim = async () => {
+    const a = 1 + Math.floor(Math.random() * 6);
+    const b = 1 + Math.floor(Math.random() * 6);
+    diceKey = `${m.id}:${m.turnNo}:${a}:${b}`;
+    showDice(a, b, true);
+    await wait(1150);
+    return [a, b];
   };
 
   /* ================= Info panels ================= */
@@ -275,39 +361,51 @@
     if (c.build) rows.push([t("g.buildings"), `${s.dome ? 5 : s.modules} / 5`]);
     return rows;
   };
-  const renderSector = (id = m.current.cell) => {
+  const renderSector = (id = shownCell()) => {
     const a = B.art(id);
     const s = m.cells[id];
     const icon = a ? `<img src="/assets/img/${a.img}.png" alt="" style="${a.hue ? `filter:hue-rotate(${a.hue}deg)` : ""}" />` : `<span class="glyph glyph--big">${B.cells[id].kind === "chance" ? "?" : B.cells[id].kind === "borgi" ? "ᗑ" : "✦"}</span>`;
     const owners = m.players.map((p) => `<li><img src="/assets/img/token-${p.color}.png" alt="" />${esc(p.name)}<b>${s && s.owners[p.id] ? Math.round(s.owners[p.id] * 100) : 0}%</b></li>`).join("");
     $("#sector-body").innerHTML = `<div class="sector-head">${icon}<div><div class="sector-name" data-testid="sector-name">${esc(nm(id))}</div>
       <div class="sub sub--xs" data-testid="sector-status">${E.statusLabel(m, id) || t(`scn.${m.scenario}.name`)}</div></div></div>
-      ${E.model(m, id) ? `<div class="sector-grid"><ul class="sector-owners">${owners}</ul><dl class="dlg-rows">${cellRows(id).map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl></div>` : ""}`;
+      ${E.model(m, id) ? `<div class="sector-grid"><ul class="sector-owners">${owners}</ul><dl class="dlg-rows">${cellRows(id).map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl></div>` : ""}
+      ${E.canConvert(m, id) && myTurn(m.current) && m.phase !== "await_move" ? `<button class="btn btn--sm sector-convert" data-g="convert" data-id="${id}" data-testid="convert-vote-btn">${t("g.convert")}</button>` : ""}`;
   };
   const renderProps = () => {
     const humans = m.players.filter((p) => isLocalHuman(p));
     const p = (isLocalHuman(m.current) ? m.current : null) || humans.find((h) => h.id === panelPlayer) || humans[0];
     if (!p) return ($("#props-panel").innerHTML = "");
     panelPlayer = p.id;
+    const prevScroll = $("#props-panel .props-scroll")?.scrollTop || 0;
+    requestAnimationFrame(() => { const sc = $("#props-panel .props-scroll"); if (sc) sc.scrollTop = prevScroll; });
     const ids = E.ownedCells(m, p);
+    if (!ids.includes(propSel)) propSel = null;
     const fc = E.fiatCur(m);
-    const kap = m.scenario.startsWith("kap");
+    const unit = unitCur();
     const rows = ids.map((id) => {
       const s = m.cells[id];
-      const own = E.soleOwner(s) === p.id && E.model(m, id) === "kap";
-      return `<tr data-testid="prop-row-${id}"><td>${esc(nm(id))}</td><td>${s.dome ? 5 : s.modules}/5</td><td>${Math.round(s.owners[p.id] * 100)}% / ${fmt(E.price(m, id), m.scenario === "nar_nar" ? "usd" : fc)}</td><td>${fmt(E.rentFor(m, id), m.scenario === "nar_nar" ? "usd" : fc)}</td></tr>
-        ${own ? `<tr class="prop-acts"><td colspan="4">
-          <button class="chipbtn" data-prop="mortgage" data-id="${id}" data-testid="prop-mortgage-${id}">${t("g.mortgage")}</button>
-          <button class="chipbtn" data-prop="sell" data-id="${id}" data-testid="prop-sell-${id}">${t("g.sell")}</button>
-          <button class="chipbtn${s.tender ? " is-on" : ""}" data-prop="tender" data-id="${id}" data-testid="prop-tender-${id}">${t("g.tender")}: ${s.tender ? t("g.on") : t("g.off")}</button>
-          <button class="chipbtn${s.collect ? " is-on" : ""}" data-prop="collect" data-id="${id}" data-testid="prop-collect-${id}">${t("g.collect")}: ${s.collect ? t("g.on") : t("g.off")}</button></td></tr>` : ""}`;
+      const tags = `${s.tender ? `<i class="ptag">T</i>` : ""}${s.mortgaged ? `<i class="ptag ptag--red">×</i>` : ""}`;
+      return `<tr class="prop-row${id === propSel ? " is-sel" : ""}" data-prop-row="${id}" data-testid="prop-row-${id}"><td>${esc(nm(id))}${tags}</td><td>${s.dome ? 5 : s.modules}/5</td>
+        <td>${Math.round(s.owners[p.id] * 100)}% / ${fmt(E.price(m, id), unit)}</td><td>${fmt(E.rentFor(m, id), unit)}</td></tr>`;
     }).join("");
+    const s = propSel && m.cells[propSel];
+    const kapOwn = !!s && E.soleOwner(s) === p.id && E.model(m, propSel) === "kap";
+    const can = kapOwn && myTurn(p);
+    const c = propSel && B.cells[propSel];
+    const dis = (ok) => (ok ? "" : "disabled");
     const debt = p.loans.reduce((a, l) => a + l.debt, 0);
     $("#props-panel").innerHTML = `<div class="panel-head"><span class="eyebrow eyebrow--gold">${t("g.player")}: ${esc(p.name)}</span></div>
-      <div class="stat-line"><span>${t("g.build")}: <b>${fmt(p.stats.build, m.scenario === "nar_nar" ? "usd" : fc)}</b></span><span>${t("g.life")}: <b>${fmt(p.stats.life, m.scenario === "nar_nar" ? "usd" : fc)}</b></span></div>
-      ${ids.length ? `<table class="props-table"><thead><tr><th></th><th>${t("g.buildings")}</th><th>${t("g.share")}</th><th>${t("g.rent")}</th></tr></thead><tbody>${rows}</tbody></table>` : `<p class="sub sub--xs">${t("g.noProps")}</p>`}
-      ${kap ? `<div class="loan-line"><span>${t("g.debt")}: <b>${fmt(debt, fc)}</b> · ${t("g.limit")}: <b>${fmt(E.loanLimit(m, p), fc)}</b></span>
-        <button class="chipbtn" data-prop="loan" data-testid="prop-loan-btn">${t("g.loan")}</button>${debt ? `<button class="chipbtn" data-prop="repay" data-testid="prop-repay-btn">${t("g.repay")}</button>` : ""}</div>` : ""}`;
+      <div class="stat-line"><span>${t("g.build")}: <b>${fmt(p.stats.build, unit)}</b></span><span>${t("g.life")}: <b>${fmt(p.stats.life, unit)}</b></span></div>
+      <div class="props-scroll" data-testid="props-scroll">${ids.length ? `<table class="props-table"><thead><tr><th></th><th>${t("g.buildings")}</th><th>${t("g.share")}</th><th>${t("g.rent")}</th></tr></thead><tbody>${rows}</tbody></table>` : `<p class="sub sub--xs">${t("g.noProps")}</p>`}</div>
+      ${m.scenario.startsWith("kap") ? `<div class="loan-line"><span>${t("g.debt")}: <b>${fmt(debt, fc)}</b> · ${t("g.limit")}: <b>${fmt(E.loanLimit(m, p), fc)}</b></span>
+        <button class="chipbtn" data-prop="loan" ${dis(myTurn(p))} data-testid="prop-loan-btn">${t("g.loan")}</button>${debt ? `<button class="chipbtn" data-prop="repay" ${dis(myTurn(p))} data-testid="prop-repay-btn">${t("g.repay")}</button>` : ""}</div>` : ""}
+      ${ids.length ? `<div class="prop-bar" data-testid="prop-action-bar">
+        <div class="prop-bar-name" data-testid="prop-selected-name">${propSel ? `${t("g.selected")}: <b>${esc(nm(propSel))}</b>` : t("g.selectProp")}</div>
+        <button class="btn btn--sm" data-prop="mortgage" ${dis(can)} data-testid="prop-mortgage-btn">${s && s.mortgaged ? t("g.redeem") : t("g.mortgageBtn")}</button>
+        <button class="btn btn--sm" data-prop="sell" ${dis(can)} data-testid="prop-sell-btn">${t("g.sellBank")}</button>
+        <button class="btn btn--sm${s && s.tender ? " is-on" : ""}" data-prop="tender" ${dis(can && c.build && !s.dome)} data-testid="prop-tender-btn">${t("g.tender")}: ${s && s.tender ? t("g.on") : t("g.off")}</button>
+        <button class="btn btn--sm${s && s.collect ? " is-on" : ""}" data-prop="collect" ${dis(can)} data-testid="prop-collect-btn">${t("g.collect")}: ${s && s.collect ? t("g.on") : t("g.off")}</button>
+      </div>` : ""}`;
   };
 
   /* ================= Actions panel ================= */
@@ -328,31 +426,56 @@
 
   /* ================= Human flows ================= */
   const optLabel = (a, o) => (o ? `${a.label} · ${fmt(o.amount, o.cur)}` : a.label);
+  // Rent selector: choose the rent kind → amount appears → pay in an available currency
+  let rentSel = null;
+  const rentSumText = (r) => r.opts.map((o) => fmt(o.amount, o.cur)).join(" = ");
+  const pickRent = (i) => {
+    if (!rentSel) return;
+    rentSel.idx = i;
+    $$(".rent-opt").forEach((b) => b.classList.toggle("is-on", +b.dataset.rent === i));
+    $("#rent-sum").textContent = rentSumText(rentSel.rents[i]);
+    $$('[data-testid^="rent-pay-"]').forEach((b) => (b.disabled = false));
+  };
   const openCell = async () => {
     const p = m.current;
     const id = p.cell;
     const acts = E.actions(m, p, id, m.turnState.stage);
     if (!acts.length) return;
-    const buttons = [];
-    acts.forEach((a) => {
-      if (a.opts.length && a.opts[0].amount > 0) a.opts.forEach((o) => buttons.push({ label: optLabel(a, o), value: { a, o }, disabled: !p.wallet.has(o.cur, o.amount) && a.id !== "narRent" && !a.mandatory, primary: a.mandatory }));
-      else buttons.push({ label: a.label, value: { a, o: a.opts[0] }, primary: a.mandatory });
+    const rents = acts.filter((a) => a.rent);
+    const others = acts.filter((a) => !a.rent);
+    const unit = unitCur();
+    rentSel = { rents, idx: rents.length === 1 ? 0 : null };
+    const curs = [...new Set(rents.flatMap((r) => r.opts.map((o) => o.cur)))];
+    const html = rents.length ? `<div class="rent-box" data-testid="rent-box">
+        <div class="rent-sum"><span>${t("g.rentSum")}</span><b id="rent-sum" data-testid="rent-sum">${rentSel.idx === 0 ? rentSumText(rents[0]) : "—"}</b></div>
+        ${rents.length > 1 ? `<p class="dlg-sub">${t("g.rentChoose")}</p>` : ""}
+        <div class="rent-opts">${rents.map((r, i) => `<button type="button" class="rent-opt${rentSel.idx === i ? " is-on" : ""}" data-rent="${i}" data-testid="rent-opt-${r.key}${r.n ? "-" + r.n : ""}"><span>${esc(r.label)}</span><b>${fmt(r.fiat, unit)}</b></button>`).join("")}</div></div>` : "";
+    const buttons = curs.map((cur) => ({
+      label: t("g.pay." + cur), primary: true, disabled: rentSel.idx == null, testid: `rent-pay-${cur}-btn`,
+      value: () => (rentSel.idx == null ? null : { a: rents[rentSel.idx], o: rents[rentSel.idx].opts.find((o) => o.cur === cur) }),
+    }));
+    others.forEach((a) => {
+      if (a.opts.length && a.opts[0].amount > 0) a.opts.forEach((o) => buttons.push({ label: optLabel(a, o), value: { a, o }, disabled: !p.wallet.has(o.cur, o.amount) && !a.mandatory, testid: `act-${a.id}-${o.cur}-btn` }));
+      else buttons.push({ label: a.label, value: { a, o: a.opts[0] }, testid: `act-${a.id}-btn` });
     });
     const mustAct = !!m.turnState.due;
-    if (!mustAct) buttons.push({ label: t("g.back"), value: null });
-    const res = await dialog({ title: nm(id), sub: E.statusLabel(m, id), rows: cellRows(id), buttons, closable: !mustAct });
+    if (!mustAct) buttons.push({ label: t("g.back"), value: null, testid: "cell-back-btn" });
+    const res = await dialog({ title: nm(id), sub: E.statusLabel(m, id), rows: cellRows(id), html, buttons, closable: !mustAct });
+    rentSel = null;
     if (res) await runAction(p, id, res.a, res.o);
     refresh();
     if (m.turnState.due && !p.isBot) setTimeout(openCell, 150);
   };
 
+  const VOTED = ["publicBuild", "publicModule", "sharedBuild"];
   const runAction = async (p, id, a, o) => {
     if (a.id === "decline") return auction(id, p);
     if (a.id === "jointBuy") return joint(id, p);
-    if (a.id === "publicBuild" || a.id === "publicModule") {
-      if (await vote(id, p)) E.publicBuild(m, id, p, a.kind);
-      m.turnState.acted[m.turnState.stage] = true;
-      if (a.mandatory) m.turnState.due = null;
+    if (VOTED.includes(a.id)) {
+      E.markDone(m, id, a.id);
+      const ok = await vote(id, p, subject(a, id));
+      const built = ok && (a.id === "sharedBuild" ? E.sharedBuild(m, id, p, a.kind) : (E.publicBuild(m, id, p, a.kind), true));
+      if (built && a.mandatory) m.turnState.due = null;
       return m.changed();
     }
     const r = E.perform(m, p, id, a, o);
@@ -383,7 +506,7 @@
   const botLimit = (b, base) => base * ({ capitalist: 1.15, neutral: 0.85, narmonist: 0.6 }[b.botType] || 0.8);
   const auction = async (id, decliner) => {
     m.turnState.declined = id;
-    m.turnState.acted.post = true;
+    E.markDone(m, id, "decline");
     const cur = E.fiatCur(m);
     const base = E.price(m, id);
     const step = E.SP.auctionStep;
@@ -413,20 +536,61 @@
     m.changed();
   };
 
-  /* ----- voting ----- */
-  const vote = async (id, initiator) => {
+  /* ----- voting: majority (> 50%) of ownership shares; unowned cell — all players equally ----- */
+  const subject = (a, id) => {
+    const unit = unitCur();
+    if (a.id === "publicBuild") return { title: t("g.subjBuy"), rows: () => [[t("g.source"), t("g.bank")], [t("g.price"), fmt(E.price(m, id), unit)]] };
+    const cost = E.buildCost(m, id, a.kind);
+    const kind = `${t("g.subjBuild")}: ${E.L(a.kind)}`;
+    if (a.id === "publicModule") return { title: kind, rows: () => [[t("g.source"), t("g.bank")], [t("g.price"), fmt(cost, unit)]] };
+    const plan = E.sharedPlan(m, id, a.kind);
+    return {
+      title: kind,
+      rows: (p) => [[t("g.source"), t("g.coOwners")], [t("g.price"), fmt(cost, unit)], [t("g.yourPart"), fmt((plan.find((x) => x.pl === p) || { part: 0 }).part, unit)], [t("g.premium"), fmt((cost * E.SP.buildPremiumPercent) / 100, unit)]],
+      botYes: (p) => { const x = plan.find((y) => y.pl === p); return !!(x && x.opt) && p.botType !== "capitalist"; },
+    };
+  };
+  const vote = async (id, initiator, subj) => {
+    const s = E.st(m, id);
+    const active = m.players.filter((p) => p.status !== "bankrupt");
+    const voters = Object.keys(s.owners).length
+      ? Object.entries(s.owners).map(([pid, w]) => ({ p: m.player(pid), w })).filter((v) => v.p && v.p.status !== "bankrupt")
+      : active.map((p) => ({ p, w: 1 / active.length }));
+    const total = voters.reduce((acc, v) => acc + v.w, 0) || 1;
     let yes = 0;
-    const voters = m.players.filter((p) => p.status !== "bankrupt");
-    for (const p of voters) {
+    for (const { p, w } of voters) {
       let v;
       if (p === initiator) v = true;
-      else if (p.isBot) v = p.botType === "narmonist" ? true : p.botType === "capitalist" ? Math.random() < 0.2 : Math.random() < 0.6;
-      else v = await ask(p, { title: t("g.vote"), sub: `${nm(id)} · ${t("g.voter")}: ${p.name}`, rows: [[t("g.initiator"), esc(initiator.name)], [t("g.source"), t("g.bank")], [t("g.price"), fmt(E.price(m, id), m.scenario === "nar_nar" ? "usd" : E.fiatCur(m))]], buttons: [{ label: t("g.yes"), value: true, primary: true, testid: "vote-yes-btn" }, { label: t("g.no"), value: false, testid: "vote-no-btn" }], closable: false });
-      if (v) yes++;
+      else if (p.isBot) v = subj.botYes ? subj.botYes(p) : p.botType === "narmonist" ? true : p.botType === "capitalist" ? Math.random() < 0.2 : Math.random() < 0.6;
+      else v = await ask(p, { title: `${t("g.vote")} · ${subj.title}`, sub: `${nm(id)} · ${t("g.voter")}: ${p.name}`, rows: [[t("g.initiator"), esc(initiator.name)], ...subj.rows(p), [t("g.weight"), `${Math.round((w / total) * 100)}%`]], buttons: [{ label: t("g.yes"), value: true, primary: true, testid: "vote-yes-btn" }, { label: t("g.no"), value: false, testid: "vote-no-btn" }], closable: false });
+      if (v) yes += w;
     }
-    const ok = yes / voters.length >= 0.5;
-    m.log({ key: "h.vote", playerId: initiator.id, params: { cell: "#" + id, yes, no: voters.length - yes, res: ok ? "@h.accepted" : "@h.rejected" } });
+    const ok = yes / total > 0.5 + 1e-9;
+    const pct = (x) => `${Math.round((x / total) * 100)}%`;
+    m.log({ key: "h.vote", playerId: initiator.id, params: { cell: "#" + id, yes: pct(yes), no: pct(total - yes), res: ok ? "@h.accepted" : "@h.rejected" } });
     return ok;
+  };
+  // Any player, on their own turn: vote to convert shared property into people's property
+  const convertVote = async (id) => {
+    const p = m.current;
+    if (!E.canConvert(m, id) || busy) return;
+    busy = true;
+    E.markDone(m, id, "convert");
+    const refunds = E.convertRefunds(m, id);
+    const subj = {
+      title: t("g.convertTitle"),
+      rows: (q) => [[t("g.refund"), fmt((refunds.find((r) => r.pl === q) || { nar: 0 }).nar, "nar")]],
+      botYes: (q) => q.botType !== "capitalist",
+    };
+    try {
+      if (await vote(id, p, subj)) {
+        E.convertShared(m, id);
+        m.log({ key: "h.converted", playerId: p.id, params: { cell: "#" + id } });
+      }
+    } finally {
+      busy = false;
+    }
+    m.changed();
   };
 
   /* ----- joint purchase ----- */
@@ -562,12 +726,44 @@
   const gameMenu = async () => {
     const v = await dialog({ title: t("game.menu"), buttons: [
       { label: t("game.finish"), value: "finish", testid: "menu-finish-btn" }, { label: t("game.bonus"), value: "bonus", testid: "menu-bonus-btn" },
+      ...(m.scenario === "kap_nar" ? [{ label: t("g.exchange"), value: "exchange", testid: "menu-exchange-btn" }] : []),
+      { label: window.MPSound.on ? t("snd.off") + " ✕" : t("snd.on"), value: "sound", testid: "menu-sound-btn" },
       { label: t("nav.rules"), value: "rules", testid: "menu-rules-btn" }, { label: t("menu.home"), value: "home", testid: "menu-home-btn" },
       { label: t("g.back"), value: null, primary: true, testid: "menu-back-btn" }] });
+    if (v === "exchange") return myTurn(m.current) ? exchange(m.current) : window.MPApp.toast(t("net.yourTurnOnly"), "error");
+    if (v === "sound") return toggleSound();
     if (v === "finish") return net() && net().seat !== 0 ? window.MPApp.toast(t("net.hostOnly"), "error") : finishGame();
     if (v === "bonus") return net() && !isDriver() ? window.MPApp.toast(t("net.yourTurnOnly"), "error") : adBonus();
     if (v === "rules") return dialog({ title: t("rules.title"), html: `<div class="modal-body">${t("rules.body")}</div>`, buttons: [{ label: t("common.ok"), value: true }] });
     if (v === "home") window.MPApp.go("start");
+  };
+
+  // Kapmonia / Narmonia: buy Narmonit for dollars at the current gold price
+  const exchange = async (p) => {
+    const gold = m.bank.goldPrice;
+    const max = Math.floor(p.wallet.usd);
+    const amount = await dialog({
+      title: t("g.exchange"), sub: p.name,
+      rows: [[t("g.rate"), `1 g = ${fmt(gold, "usd")}`], [t("game.balance"), `${fmt(p.wallet.usd, "usd")} · ${fmt(p.wallet.nar, "nar")}`]],
+      html: `<label class="dlg-input"><span>${t("g.amount")}, $</span><input type="number" id="ex-input" min="1" max="${max}" step="10" value="${Math.min(max, Math.round(gold))}" data-testid="exchange-amount-input" /></label>
+        <p class="ex-preview" data-testid="exchange-preview">${t("g.youGet")}: <b id="ex-out">${fmt(m.bank.usdToNar(Math.min(max, Math.round(gold))), "nar")}</b></p>`,
+      buttons: [{ label: t("g.exchangeDo"), primary: true, value: () => +$("#ex-input").value, testid: "exchange-confirm-btn" }, { label: t("g.back"), value: null, testid: "exchange-cancel-btn" }],
+    });
+    if (!amount) return;
+    if (amount <= 0 || !p.wallet.has("usd", amount)) return window.MPApp.toast(t("g.noFunds"), "error");
+    p.wallet.sub("usd", amount);
+    p.wallet.add("nar", m.bank.usdToNar(amount));
+    m.log({ key: "h.exchange", playerId: p.id, money: [{ cur: "usd", amount: -amount }, { cur: "nar", amount: m.bank.usdToNar(amount) }] });
+    m.changed();
+  };
+  document.addEventListener("input", (e) => {
+    if (e.target.id !== "ex-input" || !m) return;
+    $("#ex-out").textContent = fmt(m.bank.usdToNar(Math.max(0, +e.target.value || 0)), "nar");
+  });
+  const toggleSound = () => {
+    window.MPSound.toggle();
+    window.MPApp.toast(t(window.MPSound.on ? "snd.on" : "snd.off"));
+    window.MPApp.renderSoundBtn();
   };
 
   const startTurnChecks = async () => {
@@ -593,14 +789,9 @@
     busy = true;
     renderActions();
     if (!(await startTurnChecks())) return (busy = false);
-    $$("#dice .die").forEach((d) => {
-      d.classList.remove("is-rolling");
-      void d.offsetWidth;
-      d.classList.add("is-rolling");
-    });
-    await wait(600);
+    const forced = await rollAnim();
     busy = false;
-    m.roll();
+    m.roll(forced);
   };
 
   const confirmMove = async (id) => {
@@ -642,7 +833,7 @@
     const affordable = (a) => a.opts.find((o) => b.wallet.has(o.cur, o.amount) && (a.mandatory || b.wallet.get(o.cur) - o.amount >= reserve(b) * (o.cur === "nar" ? 1 : startSum)));
     const mand = acts.filter((a) => a.mandatory);
     if (mand.length) {
-      const prefs = b.botType === "narmonist" ? ["publicModule", "module", "gosBuild", "rentDouble", "narRent", "payRent", "tender", "rentOrd"] : ["tender", "module", "gosBuild", "rentOrd", "narRent", "payRent", "rentDouble", "publicModule"];
+      const prefs = b.botType === "narmonist" ? ["publicModule", "sharedBuild", "module", "gosBuild", "rentDouble", "narRent", "payRent", "tender", "rentOrd"] : ["tender", "module", "gosBuild", "rentOrd", "narRent", "payRent", "rentDouble", "publicModule", "sharedBuild"];
       for (const id of prefs) {
         const a = mand.find((x) => x.id === id && (!x.opts.length || x.opts[0].amount === 0 || affordable(x) || x.tariff === 0 || x.id === "payRent"));
         if (a) return { a, o: a.opts.find((o) => b.wallet.has(o.cur, o.amount)) || a.opts[0] };
@@ -674,7 +865,7 @@
         }
       }
       await runAction(b, b.cell, pick.a, pick.o);
-      if (!m.turnState.due && (stage === "pre" || m.turnState.acted[stage])) break;
+      if (!m.turnState.due && stage === "pre") break;
     }
     if (m.turnState.due) {
       m.turnState.due = null;
@@ -700,9 +891,9 @@
       if (m.phase === "await_roll") {
         if (!(await startTurnChecks())) return;
         await botAct(b, "pre");
-        $$("#dice .die").forEach((d) => { d.classList.remove("is-rolling"); void d.offsetWidth; d.classList.add("is-rolling"); });
-        await wait(600);
-        m.roll();
+        const conv = b.botType === "narmonist" && Object.keys(m.cells).find((id) => E.canConvert(m, id));
+        if (conv && Math.random() < 0.3) await convertVote(conv);
+        m.roll(await rollAnim());
       }
       if (m.phase === "await_move") {
         await wait(500);
@@ -733,20 +924,32 @@
   /* ================= Events ================= */
   const refresh = () => window.MPApp.renderGame();
   document.addEventListener("click", async (e) => {
+    if (e.target.closest("#btn-sound")) return toggleSound();
+    const ro = e.target.closest(".rent-opt");
+    if (ro) return pickRent(+ro.dataset.rent);
     if (!m || document.body.dataset.screen !== "game") return;
     const cellEl = e.target.closest("#board .cell");
     if (cellEl) {
       const id = cellEl.dataset.cell;
       if (m.phase === "await_move" && isLocalHuman(m.current) && !busy) {
         if (m.moveOptions.some((o) => o.id === id)) selected = id;
+        else if (id === m.current.cell) selected = null;
         else window.MPApp.toast(t("g.unavailable"), "error");
         return refresh();
       }
-      return renderSector(id);
+      if (m.phase !== "await_move") inspect = id;
+      return refresh();
+    }
+    const row = e.target.closest("[data-prop-row]");
+    if (row) {
+      propSel = row.dataset.propRow;
+      if (m.phase !== "await_move") inspect = propSel;
+      return refresh();
     }
     const g = e.target.closest("[data-g]");
     if (g && g.dataset.g === "confirm" && selected && isDriver()) return confirmMove(selected);
     if (g && g.dataset.g === "cell") return openCell();
+    if (g && g.dataset.g === "convert") return myTurn(m.current) && convertVote(g.dataset.id);
     if (e.target.closest("#btn-roll")) return isDriver() && roll();
     if (e.target.closest("#btn-finish-game")) return busy || dlgResolve ? null : net() && net().seat !== 0 ? window.MPApp.toast(t("net.hostOnly"), "error") : finishGame();
     if (e.target.closest("#btn-bonus")) return dlgResolve ? null : net() && !isDriver() ? window.MPApp.toast(t("net.yourTurnOnly"), "error") : adBonus();
@@ -755,10 +958,16 @@
     const pr = e.target.closest("[data-prop]");
     if (pr) {
       const p = m.player(panelPlayer);
-      const id = pr.dataset.id;
+      if (!myTurn(p)) return window.MPApp.toast(t("g.ownTurnOnly"), "error");
+      const id = ["loan", "repay"].includes(pr.dataset.prop) ? null : propSel;
       const s = id && m.cells[id];
+      if (id && !s) return;
       if (pr.dataset.prop === "mortgage" && !E.mortgage(m, p, id)) window.MPApp.toast(t("g.noFunds"), "error");
-      if (pr.dataset.prop === "sell") E.sellToBank(m, p, id);
+      if (pr.dataset.prop === "sell") {
+        const ok = await dialog({ title: t("g.sellConfirm"), sub: nm(id), rows: [[t("g.youGet"), fmt(E.sellPrice(m, id), E.fiatCur(m))]], buttons: [{ label: t("g.sellBank"), value: true, primary: true, testid: "sell-confirm-btn" }, { label: t("g.back"), value: null }] });
+        if (!ok) return;
+        E.sellToBank(m, p, id);
+      }
       if (pr.dataset.prop === "tender") s.tender = !s.tender;
       if (pr.dataset.prop === "collect") s.collect = !s.collect;
       if (pr.dataset.prop === "repay" && !E.repayLoans(m, p)) window.MPApp.toast(t("g.noFunds"), "error");
@@ -775,8 +984,10 @@
     attach(match) {
       const same = m && m.id === match.id;
       m = match;
-      selected = null;
       if (same) return;
+      selected = null;
+      inspect = null;
+      propSel = null;
       busy = false;
       botBusy = false;
       const b = $("#board");
@@ -790,7 +1001,9 @@
     },
     render() {
       if (!m) return;
+      if (selected && !(m.moveOptions || []).some((o) => o.id === selected)) selected = null;
       renderBoard();
+      setDice(m.lastRoll);
       renderActions();
       renderSector();
       renderProps();

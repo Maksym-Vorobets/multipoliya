@@ -84,6 +84,8 @@ window.MPPrices = {
     redeemPercent: 55,
     sellToBankPercent: 75,
     gosPayoutPercent: 25,
+    selfRentTaxPercent: 25, // Kapmonia: rent paid to yourself, only the profit tax leaves the wallet
+    buildPremiumPercent: 33.3, // Narmonia: premium to the initiator of a construction vote
     adBonus: { usd: 100, rub: 50, nar: 0.5 },
   },
 };

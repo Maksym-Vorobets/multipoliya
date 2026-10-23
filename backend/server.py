@@ -5,6 +5,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
 import os
+import asyncio
 import logging
 import random
 import secrets
@@ -15,7 +16,7 @@ from typing import Any, Dict, List, Optional
 
 import bcrypt
 import jwt
-from fastapi import FastAPI, APIRouter, HTTPException, Header, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Header, Request, WebSocket, WebSocketDisconnect
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from starlette.middleware.cors import CORSMiddleware
@@ -163,6 +164,37 @@ def seat_of(room: dict, token: Optional[str]) -> Optional[int]:
     return None
 
 
+def current_seat(room: dict) -> Optional[int]:
+    state = room.get("state") or {}
+    players = state.get("players") or []
+    active = state.get("active", 0)
+    return players[active].get("idx") if isinstance(active, int) and 0 <= active < len(players) else None
+
+
+# ----- live updates: one WebSocket per seat, every room change is pushed to everybody -----
+ROOM_SOCKETS: Dict[str, List[tuple]] = {}
+
+
+async def broadcast(code: str) -> None:
+    conns = ROOM_SOCKETS.get(code) or []
+    if not conns:
+        return
+    room = await db.rooms.find_one({"code": code}, {"_id": 0, "created_dt": 0})
+    if not room:
+        return
+    for conn in list(conns):
+        ws, seat = conn
+        try:
+            await ws.send_json({"type": "room", **public_room(room, seat, -1)})
+        except Exception:
+            if conn in conns:
+                conns.remove(conn)
+
+
+def notify(code: str) -> None:
+    asyncio.create_task(broadcast(code))
+
+
 def need_seat(room: dict, token: Optional[str]) -> int:
     seat = seat_of(room, token)
     if seat is None:
@@ -206,6 +238,7 @@ async def join_room(code: str, body: JoinIn):
     if not res.modified_count:
         raise HTTPException(409, "Seat taken, try again")
     room = await load_room(code)
+    notify(room["code"])
     return {"code": room["code"], "token": token, "seat": free["idx"], "room": public_room(room, free["idx"], -1)}
 
 
@@ -223,19 +256,28 @@ async def start_room(code: str, body: StateIn, x_room_token: Optional[str] = Hea
     if any(not s["joined"] for s in room["seats"]):
         raise HTTPException(409, "Not all players joined")
     await db.rooms.update_one({"code": room["code"]}, {"$set": {"status": "playing", "state": body.state, "version": 1}})
+    notify(room["code"])
     return {"version": 1}
 
 
 @api.post("/rooms/{code}/state")
 async def push_state(code: str, body: StateIn, x_room_token: Optional[str] = Header(None)):
     room = await load_room(code)
-    need_seat(room, x_room_token)
+    seat = need_seat(room, x_room_token)
+    # Only the player whose turn it is (or the host, who also drives the bots) may change the match
+    if seat != 0 and seat != current_seat(room):
+        raise HTTPException(403, "Not your turn")
+    old_seats = sorted(p.get("idx") for p in (room.get("state") or {}).get("players", []))
+    new_seats = sorted(p.get("idx") for p in body.state.get("players", []) if isinstance(p, dict))
+    if old_seats and old_seats != new_seats:
+        raise HTTPException(422, "Players cannot be changed")
     res = await db.rooms.update_one(
         {"code": room["code"], "version": body.version},
         {"$set": {"state": body.state, "status": "finished" if body.state.get("phase") == "finished" else "playing"}, "$inc": {"version": 1}},
     )
     if not res.modified_count:
         raise HTTPException(409, "Version conflict")
+    notify(room["code"])
     return {"version": body.version + 1}
 
 
@@ -245,6 +287,7 @@ async def create_prompt(code: str, body: PromptIn, x_room_token: Optional[str] =
     seat = need_seat(room, x_room_token)
     prompt = {"id": uuid.uuid4().hex, "from": seat, "to": body.to, "spec": body.spec, "answered": False, "value": None}
     await db.rooms.update_one({"code": room["code"]}, {"$push": {"prompts": prompt}})
+    notify(room["code"])
     return {"id": prompt["id"]}
 
 
@@ -258,6 +301,7 @@ async def answer_prompt(code: str, pid: str, body: AnswerIn, x_room_token: Optio
     )
     if not res.modified_count:
         raise HTTPException(404, "Prompt not found")
+    notify(room["code"])
     return {"ok": True}
 
 
@@ -267,6 +311,31 @@ async def ack_prompt(code: str, pid: str, x_room_token: Optional[str] = Header(N
     seat = need_seat(room, x_room_token)
     await db.rooms.update_one({"code": room["code"]}, {"$pull": {"prompts": {"id": pid, "from": seat}}})
     return {"ok": True}
+
+
+@api.websocket("/ws/rooms/{code}")
+async def room_socket(ws: WebSocket, code: str, token: str = ""):
+    room = await db.rooms.find_one({"code": code.upper()}, {"_id": 0, "created_dt": 0})
+    seat = seat_of(room, token) if room else None
+    if seat is None:
+        await ws.close(code=4403)
+        return
+    await ws.accept()
+    conn = (ws, seat)
+    ROOM_SOCKETS.setdefault(room["code"], []).append(conn)
+    try:
+        await ws.send_json({"type": "room", **public_room(room, seat, -1)})
+        while True:
+            if await ws.receive_text() == "ping":
+                await ws.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.info("room socket closed: %s", e)
+    finally:
+        conns = ROOM_SOCKETS.get(room["code"], [])
+        if conn in conns:
+            conns.remove(conn)
 
 
 app.include_router(api)

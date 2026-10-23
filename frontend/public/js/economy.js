@@ -17,7 +17,9 @@
     m_kap: ["Капмония", "Капмонія", "Kapmonia"], m_gos: ["Госмония", "Госмонія", "Gosmonia"], m_nar: ["Нармония", "Нармонія", "Narmonia"],
     s_free: ["Свободный сектор", "Вільний сектор", "Free sector"], s_private: ["Частная собственность", "Приватна власність", "Private property"],
     s_people: ["Народная собственность", "Народна власність", "People's property"], s_state: ["Государственный объект", "Державний об'єкт", "State object"],
-    s_mortgaged: ["В залоге", "У заставі", "Mortgaged"],
+    s_mortgaged: ["В залоге", "У заставі", "Mortgaged"], s_shared: ["Долевая народная собственность", "Пайова народна власність", "Shared people's property"],
+    rentMax: ["Аренда", "Оренда", "Rent"], sharedVote: ["голосование долевиков", "голосування пайовиків", "co-owners vote"],
+    selfRentTax: ["Аренда самому себе (налог {p}%)", "Оренда самому собі (податок {p}%)", "Rent to yourself (tax {p}%)"],
   };
   const LI = { ru: 0, uk: 1, en: 2 };
   const L = (k, p = {}) => {
@@ -89,17 +91,26 @@
     const group = B.groupCells(c.group, c.ring);
     if (!group.every((g) => st(m, g).modules >= 4)) return false;
     if (mdl === "kap") return group.every((g) => soleOwner(st(m, g)) === p.id);
-    if (mdl === "nar") return group.every((g) => st(m, g).owners[p.id]);
     return true;
   };
+  // Double rent: every cell of the colour group is in the same kind of people's property
+  const sameKindGroup = (m, id) => {
+    const c = B.cells[id];
+    if (c.group == null) return false;
+    const type = st(m, id).type;
+    return B.groupCells(c.group, c.ring).every((g) => model(m, g) === "nar" && st(m, g).type === type && Object.keys(st(m, g).owners).length > 0);
+  };
+  // Narmonia rent choices: only what is actually built on the cell
   const tariffs = (m, id) => {
+    const s = st(m, id);
     const t = B.rentTable(B.cells[id]);
     const f = (x) => m.bank.fiat(x);
     if (B.cells[id].kind === "station") return [{ key: "rentTariff", fiat: rentFor(m, id) }];
-    return [
-      { key: "rentTariff", fiat: f(t.base) }, { key: "rentDoubleT", fiat: f(t.double) },
-      ...[1, 2, 3, 4].map((n) => ({ key: "rentMods", n, fiat: f(t.modules[n]) })), { key: "rentDome", fiat: f(t.dome) },
-    ];
+    const list = [{ key: "rentTariff", fiat: f(t.base) }];
+    if (sameKindGroup(m, id)) list.push({ key: "rentDoubleT", fiat: f(t.double) });
+    for (let n = 1; n <= s.modules; n++) list.push({ key: "rentMods", n, fiat: f(t.modules[n]) });
+    if (s.dome) list.push({ key: "rentDome", fiat: f(t.dome) });
+    return list;
   };
 
   const propValue = (m, id, s) => {
@@ -122,21 +133,24 @@
   const turn = (m) => m.turnState;
   const improveBlocked = (m, id) => {
     const t = turn(m);
-    return t.bought.includes(id) || t.improved.includes(id) || t.improved.length >= 2;
+    return t.improved.includes(id) || t.improved.length >= 2;
   };
+  const didAct = (m, id, key) => (turn(m).done || []).includes(`${id}:${key}`);
+  const markDone = (m, id, key) => (turn(m).done = [...(turn(m).done || []), `${id}:${key}`]);
   const markImproved = (m, id, p) => {
     turn(m).improved.push(id);
     p.stats.builds = (p.stats.builds || 0) + 1;
   };
 
   /* ----- action list ----- */
+  // Every action on the current cell stays available until the turn ends (once per action per cell)
   const actions = (m, p, id, stage) => {
     const c = B.cells[id];
     const mdl = model(m, id);
     if (!mdl) return [];
     const s = st(m, id);
     const t = turn(m);
-    const acted = t.acted[stage];
+    const did = (k) => didAct(m, id, k);
     const list = [];
     const add = (a) => list.push({ ...a, opts: a.opts || [] });
     const owner = soleOwner(s);
@@ -144,49 +158,46 @@
 
     if (mdl === "kap") {
       if (s.type === "free") {
-        if (!acted) add({ id: "buy", label: L("buy"), opts: payOpts(m, price(m, id), { usdOnly: true }) });
-        if (stage === "post" && !acted) add({ id: "decline", label: L("decline") });
+        if (!did("decline")) add({ id: "buy", label: L("buy"), opts: payOpts(m, price(m, id), { usdOnly: true }) });
+        if (stage === "post" && !did("decline")) add({ id: "decline", label: L("decline") });
       } else if (owner && owner !== p.id) {
         if (due) {
           const rent = p.status === "benefit" ? rentFor(m, id, 0) : rentFor(m, id);
-          add({ id: "payRent", label: L("payRent"), opts: payOpts(m, rent), mandatory: true });
-          if (s.tender && c.build && !s.dome && !improveBlocked(m, id)) add({ id: "tender", label: L("tender"), opts: [] });
+          add({ id: "payRent", rent: true, key: "rentMax", fiat: rent, label: L("payRent"), opts: payOpts(m, rent), mandatory: true });
+          if (s.tender && c.build && !s.dome && !improveBlocked(m, id) && !did("tender")) add({ id: "tender", label: L("tender"), mandatory: true });
         }
-      } else if (owner === p.id && !acted) {
+      } else if (owner === p.id) {
         if (c.build && !s.mortgaged && s.modules < 4 && !improveBlocked(m, id)) add({ id: "module", label: L("module"), opts: payOpts(m, buildCost(m, id)) });
         if (c.build && !s.mortgaged && s.modules === 4 && !s.dome && !improveBlocked(m, id) && domeAllowed(m, p, id, "kap")) add({ id: "dome", label: L("dome"), opts: payOpts(m, buildCost(m, id, "dome")) });
-        add({ id: "selfRent", label: L("selfRent"), opts: payOpts(m, Math.round(rentFor(m, id) * 0.25)) });
+        if (!s.mortgaged && !did("selfRent")) add({ id: "selfRent", label: L("selfRentTax", { p: SP.selfRentTaxPercent }), opts: payOpts(m, Math.round((rentFor(m, id) * SP.selfRentTaxPercent) / 100)) });
       }
     }
 
     if (mdl === "gos") {
-      if (stage === "post" && due) {
+      if (due) {
         const rent = rentFor(m, id);
         add({ id: "rentOrd", label: `${L("rentOrd")} (${rent})`, mandatory: true });
         add({ id: "rentDouble", label: L("rentDouble"), opts: payOpts(m, rent * 2), mandatory: true });
       }
-      if (c.build && !improveBlocked(m, id) && (!acted || due)) {
-        if (!s.built) add({ id: "gosBuild", label: L("gosBuild"), opts: [{ cur: fiatCur(m), amount: 0 }], mandatory: due });
-        else if (s.modules < 4) add({ id: "module", label: L("module"), opts: [{ cur: fiatCur(m), amount: 0 }], mandatory: due });
-        else if (!s.dome && domeAllowed(m, p, id, "gos")) add({ id: "dome", label: L("dome"), opts: [{ cur: fiatCur(m), amount: 0 }], mandatory: due });
-      } else if (c.kind === "station" && !s.built && !acted) add({ id: "gosBuild", label: L("gosBuild"), opts: [{ cur: fiatCur(m), amount: 0 }], mandatory: due });
+      const gos = [{ cur: fiatCur(m), amount: 0 }];
+      if (c.build && !improveBlocked(m, id)) {
+        if (!s.built) add({ id: "gosBuild", label: L("gosBuild"), opts: gos, mandatory: due });
+        else if (s.modules < 4) add({ id: "module", label: L("module"), opts: gos, mandatory: due });
+        else if (!s.dome && domeAllowed(m, p, id, "gos")) add({ id: "dome", label: L("dome"), opts: gos, mandatory: due });
+      } else if (c.kind === "station" && !s.built) add({ id: "gosBuild", label: L("gosBuild"), opts: gos, mandatory: due });
     }
 
     if (mdl === "nar") {
-      const nOwners = Object.keys(s.owners).length;
-      if (nOwners === 0) {
-        if (!acted) {
-          add({ id: "indBuy", label: L("indBuy"), opts: payOpts(m, price(m, id)) });
-          add({ id: "jointBuy", label: L("jointBuy") });
-          add({ id: "publicBuild", label: L("publicBuild") });
-        }
+      if (!Object.keys(s.owners).length) {
+        add({ id: "indBuy", label: L("indBuy"), opts: payOpts(m, price(m, id)) });
+        add({ id: "jointBuy", label: L("jointBuy") });
+        if (!did("publicBuild")) add({ id: "publicBuild", label: L("publicBuild") });
       } else {
-        if (due) tariffs(m, id).forEach((tr, i) => add({ id: "narRent", tariff: i, label: L(tr.key, { n: tr.n }), opts: payOpts(m, tr.fiat), mandatory: true }));
-        if (c.build && !s.dome && !improveBlocked(m, id) && (!acted || due)) {
-          const kind = s.modules < 4 ? "module" : domeAllowed(m, p, id, "nar") ? "dome" : null;
-          if (kind && owner === p.id) add({ id: kind, label: L(kind), opts: payOpts(m, buildCost(m, id, kind)), mandatory: due });
-          else if (kind) add({ id: "publicModule", kind, label: kind === "dome" ? L("dome") + " · " + L("publicModule") : L("publicModule"), mandatory: due });
-        }
+        if (due) tariffs(m, id).forEach((r, i) => add({ id: "narRent", rent: true, tariff: i, key: r.key, n: r.n, fiat: r.fiat, label: L(r.key, { n: r.n }), opts: payOpts(m, r.fiat), mandatory: true }));
+        const kind = c.build && !s.dome && !improveBlocked(m, id) ? (s.modules < 4 ? "module" : domeAllowed(m, p, id, "nar") ? "dome" : null) : null;
+        if (kind && s.type === "shared" && owner === p.id) add({ id: kind, label: L(kind), opts: payOpts(m, buildCost(m, id, kind)), mandatory: due });
+        else if (kind && s.type === "shared" && !did("sharedBuild")) add({ id: "sharedBuild", kind, label: `${L(kind)} · ${L("sharedVote")}`, mandatory: due });
+        else if (kind && s.type !== "shared" && !did("publicModule")) add({ id: "publicModule", kind, label: kind === "dome" ? L("dome") + " · " + L("publicModule") : L("publicModule"), mandatory: due });
       }
     }
     return list;
@@ -198,16 +209,15 @@
     const c = B.cells[id];
     const t = turn(m);
     const name = "#" + id;
-    const stage = t.stage;
     const done = (mandatory) => {
       if (mandatory || a.mandatory) t.due = null;
-      else t.acted[stage] = true;
+      markDone(m, id, a.id);
     };
     switch (a.id) {
       case "buy":
       case "indBuy": {
         if (!pay(m, p, opt, "h.buy", { cell: name })) return { ok: false };
-        s.type = a.id === "buy" ? "private" : "people";
+        s.type = a.id === "buy" ? "private" : "shared";
         s.owners = { [p.id]: 1 };
         t.bought.push(id);
         p.stats.build += (opt.cur === "nar" ? opt.amount * m.bank.goldPrice : opt.amount) * (a.id === "indBuy" ? 1.333 : 0);
@@ -228,7 +238,7 @@
       }
       case "selfRent": {
         if (!pay(m, p, opt, "h.selfRent", { cell: name })) return { ok: false };
-        p.stats.life += fiatOf(m, opt) * 4;
+        p.stats.life += (fiatOf(m, opt) * 100) / SP.selfRentTaxPercent;
         done();
         return { ok: true };
       }
@@ -300,8 +310,11 @@
           p.stats.build += cost * 0.333;
           markImproved(m, id, p);
           m.log({ key: "h.tender", playerId: p.id, params: { cell: name, to: owner.name }, money: [{ cur, amount: bonus }] });
-        } else m.log({ key: "h.tenderFail", playerId: p.id, params: { cell: name } });
-        done(true);
+          done(true);
+        } else {
+          m.log({ key: "h.tenderFail", playerId: p.id, params: { cell: name } });
+          markDone(m, id, "tender");
+        }
         return { ok: true };
       }
     }
@@ -331,11 +344,10 @@
       return opt && pay(m, pl, opt, "h.jointPart", { cell: "#" + id });
     });
     if (!paid.length) return false;
-    s.type = "people";
+    s.type = "shared";
     s.owners = Object.fromEntries(paid.map((pl) => [pl.id, 1 / paid.length]));
     paid.forEach((pl) => (pl.stats.build += part));
     turn(m).bought.push(id);
-    turn(m).acted[turn(m).stage] = true;
     return true;
   };
   // Bank-funded purchase/construction after a successful vote
@@ -358,6 +370,51 @@
     if (kind) markImproved(m, id, initiator);
   };
 
+  // Shared property: co-owners pay by shares, initiator gets the premium from them by shares
+  const sharedPlan = (m, id, kind) => {
+    const cost = buildCost(m, id, kind);
+    return Object.entries(st(m, id).owners).map(([pid, share]) => {
+      const pl = m.player(pid);
+      const part = r2(cost * share);
+      return { pl, share, part, opt: payOpts(m, part).find((o) => pl.wallet.has(o.cur, o.amount)) };
+    });
+  };
+  const sharedBuild = (m, id, initiator, kind) => {
+    const s = st(m, id);
+    const name = "#" + id;
+    const plan = sharedPlan(m, id, kind);
+    if (plan.some((x) => !x.opt)) {
+      m.log({ key: "h.sharedNoFunds", playerId: initiator.id, params: { cell: name } });
+      return false;
+    }
+    const premium = (buildCost(m, id, kind) * SP.buildPremiumPercent) / 100;
+    plan.forEach((x) => {
+      pay(m, x.pl, x.opt, "h.sharedPart", { cell: name });
+      x.pl.stats.build += fiatOf(m, x.opt);
+      if (x.pl === initiator) return; // own share of the premium is paid to yourself
+      const opt = payOpts(m, r2(premium * x.share)).find((o) => x.pl.wallet.has(o.cur, o.amount));
+      if (opt && opt.amount > 0) m.transfer(x.pl, initiator, opt.cur, opt.amount, "h.premiumShare", { cell: name });
+    });
+    initiator.stats.build += premium;
+    if (kind === "dome") s.dome = true;
+    else s.modules += 1;
+    markImproved(m, id, initiator);
+    return true;
+  };
+  // Shared → people's property: the bank refunds every co-owner 100% of the invested value in Narmonit
+  const canConvert = (m, id) => model(m, id) === "nar" && st(m, id).type === "shared" && Object.keys(st(m, id).owners).length > 0 && !didAct(m, id, "convert");
+  const convertRefunds = (m, id) => {
+    const s = st(m, id);
+    const value = propValue(m, id, s);
+    return Object.entries(s.owners).map(([pid, share]) => ({ pl: m.player(pid), share, nar: m.bank.usdToNar(value * share) }));
+  };
+  const convertShared = (m, id) => {
+    const s = st(m, id);
+    convertRefunds(m, id).forEach((r) => m.credit(r.pl, "nar", r.nar, "h.convertRefund", { cell: "#" + id }));
+    const active = m.players.filter((pl) => pl.status !== "bankrupt");
+    Object.assign(s, { type: "people", owners: Object.fromEntries(active.map((pl) => [pl.id, 1 / active.length])), mortgaged: false });
+  };
+
   /* ----- property management (owner panel) ----- */
   const mortgage = (m, p, id) => {
     const s = st(m, id);
@@ -373,10 +430,13 @@
     }
     return true;
   };
+  const sellPrice = (m, id) => {
+    const s = st(m, id);
+    return Math.round((propValue(m, id, s) * (SP.sellToBankPercent - (s.mortgaged ? SP.mortgagePercent : 0))) / 100);
+  };
   const sellToBank = (m, p, id) => {
     const s = st(m, id);
-    const amount = Math.round((propValue(m, id, s) * (SP.sellToBankPercent - (s.mortgaged ? SP.mortgagePercent : 0))) / 100);
-    m.credit(p, fiatCur(m), amount, "h.sell", { cell: "#" + id });
+    m.credit(p, fiatCur(m), sellPrice(m, id), "h.sell", { cell: "#" + id });
     if (m.scenario === "kap_nar") {
       const active = m.players.filter((pl) => pl.status !== "bankrupt");
       Object.assign(s, { type: "people", owners: Object.fromEntries(active.map((pl) => [pl.id, 1 / active.length])), mortgaged: false });
@@ -496,13 +556,13 @@
     const mdl = model(m, id);
     if (!mdl) return "";
     const s = st(m, id);
-    const key = s.mortgaged ? "s_mortgaged" : mdl === "gos" ? (s.built ? "s_state" : "s_free") : s.type === "free" ? "s_free" : s.type === "people" ? "s_people" : s.type === "state" ? "s_state" : "s_private";
+    const key = s.mortgaged ? "s_mortgaged" : mdl === "gos" ? (s.built ? "s_state" : "s_free") : s.type === "free" ? "s_free" : s.type === "people" ? "s_people" : s.type === "shared" ? "s_shared" : s.type === "state" ? "s_state" : "s_private";
     return `${L("m_" + mdl)} · ${L(key)}`;
   };
 
   window.MPEco = {
     L, model, zone, fiatCur, SP, fiatOf, payOpts, canPayAny, st, price, buildCost, rentFor, tariffs, level, soleOwner, propValue, kapPropertyValue,
-    ownedCells, actions, perform, auctionWin, jointBuy, publicBuild, mortgage, sellToBank, loanLimit, takeLoan, repayLoans,
+    ownedCells, actions, perform, auctionWin, jointBuy, publicBuild, sharedBuild, sharedPlan, canConvert, convertRefunds, convertShared, markDone, didAct, mortgage, sellPrice, sellToBank, loanLimit, takeLoan, repayLoans,
     onLand, onRound, everyTurnStart, statusLabel, refreshBenefit,
   };
 })();

@@ -61,6 +61,7 @@
     document.body.classList.remove("menu-open");
     $$(".screen").forEach((s) => s.classList.toggle("is-active", s.id === `screen-${name}`));
     if (name === "start") $("#btn-continue").hidden = !localStorage.getItem("mp.match");
+    if (name === "start" && window.MPNet) window.MPNet.renderRejoin();
     if (name === "setup") renderSetup();
     if (name === "draw") renderDraw();
     if (name === "game") renderGame();
@@ -231,9 +232,8 @@
     $("#center-title").textContent = `${cur.name} · ${window.MPBoard.name(cur.cell, window.I18N.lang)}`;
     $("#center-balance").textContent = `${t("game.yourBalance")}: ${balances(cur, " / ")}`;
     const r = m.lastRoll;
-    if (r) $$("#dice .die").forEach((d, i) => (d.dataset.face = i ? r.b : r.a));
     $("#roll-result").innerHTML = r ? `${r.a} + ${r.b} = ${r.sum}${r.double ? `<em>${t("game.double")}</em>` : ""}` : "";
-    $("#history-list").innerHTML = m.history.recent(12).map(histItem).join("");
+    $("#history-list").innerHTML = m.history.recent(80).map(histItem).join("");
     $("#history-list").scrollTop = 1e6;
     window.MPGame.render();
   };
@@ -322,7 +322,7 @@
     const m = new Match(state);
     m.online = true;
     attach(m);
-    if (ui.screen !== "game" && ui.screen !== "results") go("game");
+    if (ui.screen === "lobby") go("game");
     else if (ui.screen === "game") renderGame();
     window.MPGame.scheduleBot();
   };
@@ -335,6 +335,8 @@
     Match.clear();
     return JSON.parse(JSON.stringify(m));
   };
-  window.MPApp = { toast, renderGame, go, applyRemote, startOnline, esc };
+  const renderSoundBtn = () => $("#btn-sound").classList.toggle("is-off", !window.MPSound.on);
+  renderSoundBtn();
+  window.MPApp = { toast, renderGame, go, applyRemote, startOnline, esc, renderSoundBtn };
   window.MP = { ui, go }; // debug hook
 })();
