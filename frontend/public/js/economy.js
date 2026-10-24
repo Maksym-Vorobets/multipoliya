@@ -135,6 +135,12 @@
     const t = turn(m);
     return t.improved.includes(id) || t.improved.length >= 2;
   };
+  const addSpent = (s, pl, opt) => {
+    s.spent = s.spent || {};
+    const sp = (s.spent[pl.id] = s.spent[pl.id] || {});
+    sp[opt.cur] = r2((sp[opt.cur] || 0) + opt.amount);
+    return true;
+  };
   const didAct = (m, id, key) => (turn(m).done || []).includes(`${id}:${key}`);
   const markDone = (m, id, key) => (turn(m).done = [...(turn(m).done || []), `${id}:${key}`]);
   const markImproved = (m, id, p) => {
@@ -219,6 +225,8 @@
         if (!pay(m, p, opt, "h.buy", { cell: name })) return { ok: false };
         s.type = a.id === "buy" ? "private" : "shared";
         s.owners = { [p.id]: 1 };
+        s.spent = {};
+        if (a.id === "indBuy") addSpent(s, p, opt);
         t.bought.push(id);
         p.stats.build += (opt.cur === "nar" ? opt.amount * m.bank.goldPrice : opt.amount) * (a.id === "indBuy" ? 1.333 : 0);
         refreshBenefit(m, p);
@@ -254,6 +262,7 @@
         } else {
           if (!pay(m, p, opt, a.id === "dome" ? "h.dome" : "h.module", { cell: name })) return { ok: false };
           p.stats.build += cost * 1.333;
+          if (s.type === "shared") addSpent(s, p, opt);
         }
         if (a.id === "dome") s.dome = true;
         else s.modules += 1;
@@ -341,7 +350,7 @@
     const paid = players.filter((pl) => {
       const opts = payOpts(m, part);
       const opt = opts.find((o) => pl.wallet.has(o.cur, o.amount));
-      return opt && pay(m, pl, opt, "h.jointPart", { cell: "#" + id });
+      return opt && pay(m, pl, opt, "h.jointPart", { cell: "#" + id }) && addSpent(s, pl, opt);
     });
     if (!paid.length) return false;
     s.type = "shared";
@@ -394,6 +403,7 @@
     const premium = (buildCost(m, id, kind) * SP.buildPremiumPercent) / 100;
     plan.forEach((x) => {
       pay(m, x.pl, x.opt, "h.sharedPart", { cell: name });
+      addSpent(s, x.pl, x.opt);
       x.pl.stats.build += fiatOf(m, x.opt);
       if (x.premOpt.amount > 0) m.transfer(x.pl, initiator, x.premOpt.cur, x.premOpt.amount, "h.premiumShare", { cell: name });
     });
@@ -405,16 +415,71 @@
   };
   // Shared → people's property: the bank refunds every co-owner 100% of the invested value in Narmonit
   const canConvert = (m, id) => model(m, id) === "nar" && st(m, id).type === "shared" && Object.keys(st(m, id).owners).length > 0 && !didAct(m, id, "convert");
+  // Refund = what each owner actually spent on the cell, modules and dome; dollars converted at today's gold price
   const convertRefunds = (m, id) => {
     const s = st(m, id);
-    const value = propValue(m, id, s);
-    return Object.entries(s.owners).map(([pid, share]) => ({ pl: m.player(pid), share, nar: m.bank.usdToNar(value * share) }));
+    return Object.entries(s.owners).map(([pid, share]) => {
+      const sp = (s.spent || {})[pid] || {};
+      return { pl: m.player(pid), share, nar: r2((sp.nar || 0) + m.bank.usdToNar(sp.usd || 0)) };
+    });
+  };
+
+  /* ----- shared property: buying a share at the standard price (cell + modules + dome), no bargaining ----- */
+  const SHARE_SETS = [[1], [0.5, 0.5], [1 / 3, 1 / 3, 1 / 3], [0.25, 0.25, 0.25, 0.25]]; // 100 / 50 / 33 / 25 %
+  const EPS = 1e-6;
+  const shareValue = (m, id) => {
+    const s = st(m, id);
+    return Math.round(price(m, id) + (B.cells[id].build ? buildCost(m, id) * s.modules + (s.dome ? buildCost(m, id, "dome") : 0) : 0));
+  };
+  // Allowed targets for the buyer: final shares form an allowed set, nobody else gains,
+  // nobody drops out, and the buyer ends up with no more than any other owner
+  const shareOffers = (m, id, buyer) => {
+    const s = st(m, id);
+    if (model(m, id) !== "nar" || s.type !== "shared" || s.mortgaged) return [];
+    const mine = s.owners[buyer.id] || 0;
+    const others = Object.entries(s.owners).filter(([pid]) => pid !== buyer.id).sort((a, b) => b[1] - a[1]);
+    if (!others.length) return [];
+    const value = shareValue(m, id);
+    const offers = [];
+    [0.25, 1 / 3, 0.5].forEach((x) => {
+      if (x <= mine + EPS) return;
+      SHARE_SETS.filter((set) => set.length === others.length + 1).forEach((set) => {
+        if (offers.some((o) => Math.abs(o.share - x) < EPS)) return;
+        const rest = [...set];
+        const i = rest.findIndex((v) => Math.abs(v - x) < EPS);
+        if (i < 0) return;
+        rest.splice(i, 1);
+        rest.sort((a, b) => b - a);
+        const ok = others.every(([, old], k) => rest[k] <= old + EPS && rest[k] > EPS && x <= rest[k] + EPS);
+        if (!ok) return;
+        const sellers = others.map(([pid, old], k) => ({ pl: m.player(pid), old, next: rest[k], give: old - rest[k] })).filter((v) => v.give > EPS);
+        const pays = sellers.map((v) => ({ ...v, amount: Math.round(value * v.give) }));
+        offers.push({ share: x, total: pays.reduce((acc, v) => acc + v.amount, 0), pays, next: Object.fromEntries([[buyer.id, x], ...others.map(([pid], k) => [pid, rest[k]])]) });
+      });
+    });
+    return offers;
+  };
+  const buyShare = (m, id, buyer, offer, cur) => {
+    const s = st(m, id);
+    const conv = (x) => (cur === "nar" ? m.bank.usdToNar(x) : x);
+    if (!buyer.wallet.has(cur, conv(offer.total))) return false;
+    s.spent = s.spent || {};
+    offer.pays.forEach((v) => {
+      m.transfer(buyer, v.pl, cur, conv(v.amount), "h.shareSold", { cell: "#" + id, share: Math.round(v.give * 100) + "%" });
+      const sp = s.spent[v.pl.id];
+      if (sp) Object.keys(sp).forEach((k) => (sp[k] = r2((sp[k] * v.next) / v.old)));
+    });
+    addSpent(s, buyer, { cur, amount: conv(offer.total) });
+    s.owners = offer.next;
+    buyer.stats.build += offer.total;
+    refreshBenefit(m, buyer);
+    return true;
   };
   const convertShared = (m, id) => {
     const s = st(m, id);
     convertRefunds(m, id).forEach((r) => m.credit(r.pl, "nar", r.nar, "h.convertRefund", { cell: "#" + id }));
     const active = m.players.filter((pl) => pl.status !== "bankrupt");
-    Object.assign(s, { type: "people", owners: Object.fromEntries(active.map((pl) => [pl.id, 1 / active.length])), mortgaged: false });
+    Object.assign(s, { type: "people", owners: Object.fromEntries(active.map((pl) => [pl.id, 1 / active.length])), mortgaged: false, spent: {} });
   };
 
   /* ----- property management (owner panel) ----- */
@@ -564,7 +629,7 @@
 
   window.MPEco = {
     L, model, zone, fiatCur, SP, fiatOf, payOpts, canPayAny, st, price, buildCost, rentFor, tariffs, level, soleOwner, propValue, kapPropertyValue,
-    ownedCells, actions, perform, auctionWin, jointBuy, publicBuild, sharedBuild, sharedPlan, canConvert, convertRefunds, convertShared, markDone, didAct, mortgage, sellPrice, sellToBank, loanLimit, takeLoan, repayLoans,
+    ownedCells, actions, perform, auctionWin, jointBuy, publicBuild, sharedBuild, sharedPlan, canConvert, convertRefunds, convertShared, shareOffers, buyShare, markDone, didAct, mortgage, sellPrice, sellToBank, loanLimit, takeLoan, repayLoans,
     onLand, onRound, everyTurnStart, statusLabel, refreshBenefit,
   };
 })();

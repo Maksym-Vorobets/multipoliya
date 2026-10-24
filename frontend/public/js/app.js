@@ -218,7 +218,7 @@
     const m = ui.match;
     if (!m) return go("start");
     const cur = m.current;
-    $("#turn-no").textContent = m.turnNo;
+    $("#turn-no").textContent = m.roundNo; // a turn = every player has rolled once; doubles stay in the same turn
     $("#gold-price").textContent = m.bank.goldPrice.toLocaleString("ru-RU");
     $("#players-list").innerHTML = m.players.map((p, i) => `
       <li class="pl-item${i === m.active ? " is-active" : ""}" data-testid="player-card-${p.color}">

@@ -79,6 +79,9 @@
     "g.otherActs": ["Другие действия", "Інші дії", "Other actions"], "g.weight": ["Доля голоса", "Частка голосу", "Vote weight"],
     "g.coOwners": ["Средства долевиков", "Кошти пайовиків", "Co-owners' funds"], "g.yourPart": ["Ваша часть", "Ваша частина", "Your part"],
     "g.convert": ["Голосование: перевести в народную", "Голосування: перевести в народну", "Vote: convert to people's property"],
+    "g.buyShare": ["Выкупить долю", "Викупити частку", "Buy a share"],
+    "h.shareBought": ["Выкуплена доля {share} в {cell}", "Викуплено частку {share} у {cell}", "Bought a {share} share of {cell}"],
+    "h.shareSold": ["Продажа доли {share} в {cell} → {to}:", "Продаж частки {share} у {cell} → {to}:", "Share {share} of {cell} sold → {to}:"],
     "g.convertTitle": ["Перевод в народную собственность", "Переведення в народну власність", "Conversion to people's property"],
     "g.refund": ["Возврат вам от банка", "Повернення вам від банку", "Bank refund to you"], "g.subjBuy": ["Покупка за счёт банка", "Купівля коштом банку", "Purchase funded by bank"],
     "g.subjBuild": ["Строительство", "Будівництво", "Construction"], "g.premium": ["Премия инициатору", "Премія ініціатору", "Initiator premium"],
@@ -370,6 +373,7 @@
     $("#sector-body").innerHTML = `<div class="sector-head">${icon}<div><div class="sector-name" data-testid="sector-name">${esc(nm(id))}</div>
       <div class="sub sub--xs" data-testid="sector-status">${E.statusLabel(m, id) || t(`scn.${m.scenario}.name`)}</div></div></div>
       ${E.model(m, id) ? `<div class="sector-grid"><ul class="sector-owners">${owners}</ul><dl class="dlg-rows">${cellRows(id).map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl></div>` : ""}
+      ${myTurn(m.current) && m.phase !== "await_move" ? E.shareOffers(m, id, m.current).map((o) => `<button class="btn btn--sm sector-convert" data-g="buyshare" data-id="${id}" data-share="${o.share}" data-testid="buy-share-${Math.round(o.share * 100)}-btn">${t("g.buyShare")} ${Math.round(o.share * 100)}% · ${fmt(o.total, unitCur())}</button>`).join("") : ""}
       ${E.canConvert(m, id) && myTurn(m.current) && m.phase !== "await_move" ? `<button class="btn btn--sm sector-convert" data-g="convert" data-id="${id}" data-testid="convert-vote-btn">${t("g.convert")}</button>` : ""}`;
   };
   const renderProps = () => {
@@ -554,7 +558,7 @@
   const vote = async (id, initiator, subj) => {
     const s = E.st(m, id);
     const active = m.players.filter((p) => p.status !== "bankrupt");
-    const voters = Object.keys(s.owners).length
+    const voters = Object.keys(s.owners).length && !subj.equal
       ? Object.entries(s.owners).map(([pid, w]) => ({ p: m.player(pid), w })).filter((v) => v.p && v.p.status !== "bankrupt")
       : active.map((p) => ({ p, w: 1 / active.length }));
     const total = voters.reduce((acc, v) => acc + v.w, 0) || 1;
@@ -566,11 +570,29 @@
       else v = await ask(p, { title: `${t("g.vote")} · ${subj.title}`, sub: `${nm(id)} · ${t("g.voter")}: ${p.name}`, rows: [[t("g.initiator"), esc(initiator.name)], ...subj.rows(p), [t("g.weight"), `${Math.round((w / total) * 100)}%`]], buttons: [{ label: t("g.yes"), value: true, primary: true, testid: "vote-yes-btn" }, { label: t("g.no"), value: false, testid: "vote-no-btn" }], closable: false });
       if (v) yes += w;
     }
-    const ok = yes / total > 0.5 + 1e-9;
+    const ok = yes / total >= 0.5 - 1e-9; // 50 % «за» — решение принято
     const pct = (x) => `${Math.round((x / total) * 100)}%`;
     m.log({ key: "h.vote", playerId: initiator.id, params: { cell: "#" + id, yes: pct(yes), no: pct(total - yes), res: ok ? "@h.accepted" : "@h.rejected" } });
     return ok;
   };
+  // Buy a share of shared property from its owners at the standard price
+  const buyShareFlow = async (id, share) => {
+    const p = m.current;
+    const offer = E.shareOffers(m, id, p).find((o) => Math.abs(o.share - share) < 1e-6);
+    if (!offer) return;
+    const unit = unitCur();
+    const curs = E.payOpts(m, offer.total);
+    const res = await dialog({
+      title: `${t("g.buyShare")} ${Math.round(share * 100)}%`, sub: nm(id),
+      rows: [[t("g.price"), fmt(offer.total, unit)], ...offer.pays.map((v) => [`→ ${esc(v.pl.name)} (${Math.round(v.old * 100)}% → ${Math.round(v.next * 100)}%)`, fmt(v.amount, unit)])],
+      buttons: [...curs.map((o) => ({ label: `${t("g.pay." + o.cur)} · ${fmt(o.amount, o.cur)}`, value: o.cur, primary: true, disabled: !p.wallet.has(o.cur, o.amount), testid: `buy-share-pay-${o.cur}-btn` })), { label: t("g.back"), value: null, testid: "buy-share-cancel-btn" }],
+    });
+    if (!res) return;
+    if (!E.buyShare(m, id, p, offer, res)) return window.MPApp.toast(t("g.noFunds"), "error");
+    m.log({ key: "h.shareBought", playerId: p.id, params: { cell: "#" + id, share: Math.round(share * 100) + "%" } });
+    m.changed();
+  };
+
   // Any player, on their own turn: vote to convert shared property into people's property
   const convertVote = async (id) => {
     const p = m.current;
@@ -579,6 +601,7 @@
     E.markDone(m, id, "convert");
     const refunds = E.convertRefunds(m, id);
     const subj = {
+      equal: true, // all players vote equally, regardless of shares
       title: t("g.convertTitle"),
       rows: (q) => [[t("g.refund"), fmt((refunds.find((r) => r.pl === q) || { nar: 0 }).nar, "nar")]],
       botYes: (q) => q.botType !== "capitalist",
@@ -951,6 +974,7 @@
     if (g && g.dataset.g === "confirm" && selected && isDriver()) return confirmMove(selected);
     if (g && g.dataset.g === "cell") return openCell();
     if (g && g.dataset.g === "convert") return myTurn(m.current) && convertVote(g.dataset.id);
+    if (g && g.dataset.g === "buyshare") return myTurn(m.current) && buyShareFlow(g.dataset.id, +g.dataset.share);
     if (e.target.closest("#btn-roll")) return isDriver() && roll();
     if (e.target.closest("#btn-finish-game")) return busy || dlgResolve ? null : net() && net().seat !== 0 ? window.MPApp.toast(t("net.hostOnly"), "error") : finishGame();
     if (e.target.closest("#btn-bonus")) return dlgResolve ? null : net() && !isDriver() ? window.MPApp.toast(t("net.yourTurnOnly"), "error") : adBonus();
