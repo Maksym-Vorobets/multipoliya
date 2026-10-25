@@ -1,4 +1,4 @@
-const CACHE = "multipolia-v5";
+const CACHE = "multipolia-v6";
 const ASSETS = [
   "/",
   "/index.html",
@@ -13,6 +13,7 @@ const ASSETS = [
   "/js/cards.js",
   "/js/state.js",
   "/js/economy.js",
+  "/js/fullscreen.js",
   "/js/sound.js",
   "/js/game.js",
   "/css/board.css",
