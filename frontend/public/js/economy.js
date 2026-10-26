@@ -18,6 +18,7 @@
     s_free: ["Свободный сектор", "Вільний сектор", "Free sector"], s_private: ["Частная собственность", "Приватна власність", "Private property"],
     s_people: ["Народная собственность", "Народна власність", "People's property"], s_state: ["Государственный объект", "Державний об'єкт", "State object"],
     s_mortgaged: ["В залоге", "У заставі", "Mortgaged"], s_shared: ["Долевая народная собственность", "Пайова народна власність", "Shared people's property"],
+    utilRoll: ["Бросить кубики для расчёта аренды", "Кинути кубики для розрахунку оренди", "Roll the dice to set the rent"],
     rentMax: ["Аренда", "Оренда", "Rent"], sharedVote: ["голосование долевиков", "голосування пайовиків", "co-owners vote"],
     selfRentTax: ["Аренда самому себе (налог {p}%)", "Оренда самому собі (податок {p}%)", "Rent to yourself (tax {p}%)"],
   };
@@ -72,7 +73,9 @@
     if (c.kind === "station" || c.kind === "utility") {
       const count = Math.max(1, B.setCells(c.kind, c.ring).filter((k) => sameHolding(m, id, k)).length);
       if (c.kind === "station") return m.bank.fiat(c.rent[Math.min(3, count - 1)]);
-      const sum = (m.lastRoll && m.lastRoll.sum) || 7;
+      // Utilities: the tenant rolls the dice once more; until then show the middle bracket
+      const ur = m.turnState && m.turnState.utilRoll;
+      const sum = ur && ur.id === id ? ur.sum : 7;
       return m.bank.fiat((count >= 2 ? c.rent.both : c.rent.one)[sum <= 4 ? 0 : sum <= 8 ? 1 : 2]);
     }
     const t = B.rentTable(c);
@@ -173,6 +176,7 @@
     const add = (a) => list.push({ ...a, opts: a.opts || [] });
     const owner = soleOwner(s);
     const due = stage === "post" && t.due && t.due.id === id;
+    if (due && c.kind === "utility" && !(t.utilRoll && t.utilRoll.id === id)) return [{ id: "utilRoll", label: L("utilRoll"), opts: [], mandatory: true }];
 
     if (mdl === "kap") {
       if (s.type === "free") {

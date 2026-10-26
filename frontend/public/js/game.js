@@ -82,6 +82,7 @@
     "g.rentDice1": ["Аренда (2–4 / 5–8 / 9–12), 1 поле", "Оренда (2–4 / 5–8 / 9–12), 1 поле", "Rent (2–4 / 5–8 / 9–12), 1 field"],
     "g.rentDice2": ["Аренда при Квантале и Айсайте", "Оренда при Квантал і Айсайт", "Rent with Kvantal and Icite"],
     "g.rentStations": ["Аренда за 1 / 2 / 3 / 4 станции", "Оренда за 1 / 2 / 3 / 4 станції", "Rent for 1 / 2 / 3 / 4 stations"],
+    "h.utilRoll": ["Бросок для аренды {cell}: {a} + {b} = {sum}", "Кидок для оренди {cell}: {a} + {b} = {sum}", "Rent roll {cell}: {a} + {b} = {sum}"],
     "g.buyShare": ["Выкупить долю", "Викупити частку", "Buy a share"],
     "h.shareBought": ["Выкуплена доля {share} в {cell}", "Викуплено частку {share} у {cell}", "Bought a {share} share of {cell}"],
     "h.shareSold": ["Продажа доли {share} в {cell} → {to}:", "Продаж частки {share} у {cell} → {to}:", "Share {share} of {cell} sold → {to}:"],
@@ -482,6 +483,12 @@
   const VOTED = ["publicBuild", "publicModule", "sharedBuild"];
   const runAction = async (p, id, a, o) => {
     if (a.id === "decline") return auction(id, p);
+    if (a.id === "utilRoll") {
+      const [x, y] = await rollAnim();
+      m.turnState.utilRoll = { id, a: x, b: y, sum: x + y };
+      m.log({ key: "h.utilRoll", playerId: p.id, params: { cell: "#" + id, a: x, b: y, sum: x + y } });
+      return m.changed();
+    }
     if (a.id === "jointBuy") return joint(id, p);
     if (VOTED.includes(a.id)) {
       E.markDone(m, id, a.id);
@@ -883,7 +890,7 @@
     const affordable = (a) => a.opts.find((o) => b.wallet.has(o.cur, o.amount) && (a.mandatory || b.wallet.get(o.cur) - o.amount >= reserve(b) * (o.cur === "nar" ? 1 : startSum)));
     const mand = acts.filter((a) => a.mandatory);
     if (mand.length) {
-      const prefs = b.botType === "narmonist" ? ["publicModule", "sharedBuild", "module", "gosBuild", "rentDouble", "narRent", "payRent", "tender", "rentOrd"] : ["tender", "module", "gosBuild", "rentOrd", "narRent", "payRent", "rentDouble", "publicModule", "sharedBuild"];
+      const prefs = b.botType === "narmonist" ? ["utilRoll", "publicModule", "sharedBuild", "module", "gosBuild", "rentDouble", "narRent", "payRent", "tender", "rentOrd"] : ["utilRoll", "tender", "module", "gosBuild", "rentOrd", "narRent", "payRent", "rentDouble", "publicModule", "sharedBuild"];
       for (const id of prefs) {
         const a = mand.find((x) => x.id === id && (!x.opts.length || x.opts[0].amount === 0 || affordable(x) || x.tariff === 0 || x.id === "payRent"));
         if (a) return { a, o: a.opts.find((o) => b.wallet.has(o.cur, o.amount)) || a.opts[0] };
@@ -1056,7 +1063,7 @@
       if (!m) return;
       if (selected && !(m.moveOptions || []).some((o) => o.id === selected)) selected = null;
       renderBoard();
-      setDice(m.lastRoll);
+      setDice(m.turnState.utilRoll || m.lastRoll);
       renderActions();
       renderSector();
       renderProps();
