@@ -62,6 +62,7 @@
     $$(".screen").forEach((s) => s.classList.toggle("is-active", s.id === `screen-${name}`));
     if (name === "start") $("#btn-continue").hidden = !localStorage.getItem("mp.match");
     if (name === "start" && window.MPNet) window.MPNet.renderRejoin();
+    if (name === "start") renderResume();
     if (name === "setup") renderSetup();
     if (name === "draw") renderDraw();
     if (name === "game") renderGame();
@@ -336,8 +337,12 @@
     Match.clear();
     return JSON.parse(JSON.stringify(m));
   };
+  // Mobile start screen: «Правила» gives way to «Продолжить» / «Вернуться» (rules stay in the menu)
+  function renderResume() {
+    $("#screen-start").classList.toggle("has-resume", !$("#btn-continue").hidden || !$("#btn-rejoin").hidden);
+  }
   const renderSoundBtn = () => $("#btn-sound").classList.toggle("is-off", !window.MPSound.on);
   renderSoundBtn();
-  window.MPApp = { toast, renderGame, go, applyRemote, startOnline, esc, renderSoundBtn };
+  window.MPApp = { toast, renderGame, go, applyRemote, startOnline, esc, renderSoundBtn, renderResume };
   window.MP = { ui, go }; // debug hook
 })();

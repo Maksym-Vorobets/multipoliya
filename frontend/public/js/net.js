@@ -305,6 +305,7 @@
     const btn = $("#btn-rejoin");
     const last = session || JSON.parse(localStorage.getItem(LAST) || "null");
     btn.hidden = !last;
+    window.MPApp.renderResume();
   };
   window.MPNet = { get session() { return session; }, createRoom, prompt, push, leave, renderLobby, renderRejoin, rejoin };
 

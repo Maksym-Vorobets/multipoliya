@@ -88,6 +88,7 @@
     "h.cover": ["Доплата другой валютой по цене золота:", "Доплата іншою валютою за ціною золота:", "Topped up with the other currency at gold price:"],
     "h.sellShare": ["Доля {cell} продана банку:", "Частку {cell} продано банку:", "Share of {cell} sold to the bank:"],
     "h.bankrupt": ["{name} — банкрот: отдано всё, возврат на «Исток», статус «На пособии»", "{name} — банкрут: віддано все, повернення на «Витік», статус «На допомозі»", "{name} is bankrupt: everything paid, back to the start, status: benefit"],
+    "g.exchangeOnlyKapNar": ["Обмен валют доступен в сценарии «Капмония / Нармония»", "Обмін валют доступний у сценарії «Капмонія / Нармонія»", "Currency exchange is available in the Kapmonia / Narmonia scenario"],
     "g.buyShare": ["Выкупить долю", "Викупити частку", "Buy a share"],
     "h.shareBought": ["Выкуплена доля {share} в {cell}", "Викуплено частку {share} у {cell}", "Bought a {share} share of {cell}"],
     "h.shareSold": ["Продажа доли {share} в {cell} → {to}:", "Продаж частки {share} у {cell} → {to}:", "Share {share} of {cell} sold → {to}:"],
@@ -395,11 +396,13 @@
     const s = m.cells[id];
     const icon = a ? `<img src="/assets/img/${a.img}.png" alt="" style="${a.hue ? `filter:hue-rotate(${a.hue}deg)` : ""}" />` : `<span class="glyph glyph--big">${B.cells[id].kind === "chance" ? "?" : B.cells[id].kind === "borgi" ? "ᗑ" : "✦"}</span>`;
     const owners = m.players.map((p) => `<li><img src="/assets/img/token-${p.color}.png" alt="" />${esc(p.name)}<b>${s && s.owners[p.id] ? Math.round(s.owners[p.id] * 100) : 0}%</b></li>`).join("");
-    $("#sector-body").innerHTML = `<div class="sector-head">${icon}<div><div class="sector-name" data-testid="sector-name">${esc(nm(id))}</div>
+    const html = `<div class="sector-head">${icon}<div><div class="sector-name" data-testid="sector-name">${esc(nm(id))}</div>
       <div class="sub sub--xs" data-testid="sector-status">${E.statusLabel(m, id) || t(`scn.${m.scenario}.name`)}</div></div></div>
       ${E.model(m, id) ? `<div class="sector-grid"><ul class="sector-owners">${owners}</ul><dl class="dlg-rows">${cellRows(id).map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl></div>` : ""}
       ${myTurn(m.current) && m.phase !== "await_move" ? E.shareOffers(m, id, m.current).map((o) => `<button class="btn btn--sm sector-convert" data-g="buyshare" data-id="${id}" data-share="${o.share}" data-testid="buy-share-${Math.round(o.share * 100)}-btn">${t("g.buyShare")} ${Math.round(o.share * 100)}% · ${fmt(o.total, unitCur())}</button>`).join("") : ""}
       ${E.canConvert(m, id) && myTurn(m.current) && m.phase !== "await_move" ? `<button class="btn btn--sm sector-convert" data-g="convert" data-id="${id}" data-testid="convert-vote-btn">${t("g.convert")}</button>` : ""}`;
+    $("#sector-body").innerHTML = html;
+    $("#sector-body-m").innerHTML = html.replace(/data-testid="/g, 'data-testid="m-'); // mobile: under the board
   };
   const renderProps = () => {
     const humans = m.players.filter((p) => isLocalHuman(p));
@@ -850,11 +853,11 @@
   const gameMenu = async () => {
     const v = await dialog({ title: t("game.menu"), buttons: [
       { label: t("game.finish"), value: "finish", testid: "menu-finish-btn" }, { label: t("game.bonus"), value: "bonus", testid: "menu-bonus-btn" },
-      ...(m.scenario === "kap_nar" ? [{ label: t("g.exchange"), value: "exchange", testid: "menu-exchange-btn" }] : []),
+      { label: t("g.exchange"), value: "exchange", testid: "menu-exchange-btn" },
       ...commonItems(),
       { label: t("nav.rules"), value: "rules", testid: "menu-rules-btn" }, { label: t("menu.home"), value: "home", testid: "menu-home-btn" },
       { label: t("g.back"), value: null, primary: true, testid: "menu-back-btn" }] });
-    if (v === "exchange") return myTurn(m.current) ? exchange(m.current) : window.MPApp.toast(t("net.yourTurnOnly"), "error");
+    if (v === "exchange") return m.scenario !== "kap_nar" ? window.MPApp.toast(t("g.exchangeOnlyKapNar"), "error") : myTurn(m.current) ? exchange(m.current) : window.MPApp.toast(t("net.yourTurnOnly"), "error");
     if (commonAction(v)) return;
     if (v === "finish") return net() && net().seat !== 0 ? window.MPApp.toast(t("net.hostOnly"), "error") : finishGame();
     if (v === "bonus") return net() && !isDriver() ? window.MPApp.toast(t("net.yourTurnOnly"), "error") : adBonus();
