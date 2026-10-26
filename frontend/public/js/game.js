@@ -83,6 +83,11 @@
     "g.rentDice2": ["Аренда при Квантале и Айсайте", "Оренда при Квантал і Айсайт", "Rent with Kvantal and Icite"],
     "g.rentStations": ["Аренда за 1 / 2 / 3 / 4 станции", "Оренда за 1 / 2 / 3 / 4 станції", "Rent for 1 / 2 / 3 / 4 stations"],
     "h.utilRoll": ["Бросок для аренды {cell}: {a} + {b} = {sum}", "Кидок для оренди {cell}: {a} + {b} = {sum}", "Rent roll {cell}: {a} + {b} = {sum}"],
+    "g.sellToPay": ["Не хватает денег на аренду: продайте собственность банку", "Бракує грошей на оренду: продайте власність банку", "Not enough money for rent: sell property to the bank"],
+    "g.missing": ["Не хватает", "Бракує", "Missing"],
+    "h.cover": ["Доплата другой валютой по цене золота:", "Доплата іншою валютою за ціною золота:", "Topped up with the other currency at gold price:"],
+    "h.sellShare": ["Доля {cell} продана банку:", "Частку {cell} продано банку:", "Share of {cell} sold to the bank:"],
+    "h.bankrupt": ["{name} — банкрот: отдано всё, возврат на «Исток», статус «На пособии»", "{name} — банкрут: віддано все, повернення на «Витік», статус «На допомозі»", "{name} is bankrupt: everything paid, back to the start, status: benefit"],
     "g.buyShare": ["Выкупить долю", "Викупити частку", "Buy a share"],
     "h.shareBought": ["Выкуплена доля {share} в {cell}", "Викуплено частку {share} у {cell}", "Bought a {share} share of {cell}"],
     "h.shareSold": ["Продажа доли {share} в {cell} → {to}:", "Продаж частки {share} у {cell} → {to}:", "Share {share} of {cell} sold → {to}:"],
@@ -497,9 +502,48 @@
       if (built && a.mandatory) m.turnState.due = null;
       return m.changed();
     }
+    if (a.rent && o && !p.wallet.has(o.cur, o.amount) && !(await coverRent(p, id, a, o))) return m.changed();
     const r = E.perform(m, p, id, a, o);
     if (!r.ok && !p.isBot) await noFunds(p, o, a);
     m.changed();
+  };
+  // Not enough money for rent: other currency → loan / sell own private or shared property → bankruptcy
+  const coverRent = async (p, id, a, o) => {
+    const fc = E.fiatCur(m);
+    for (let guard = 0; guard < 40; guard++) {
+      if (E.cover(m, p, o)) return true;
+      const short = E.shortfall(m, p, o);
+      const list = E.holdings(m, p).sort((x, y) => E.holdingValue(m, x, p) - E.holdingValue(m, y, p));
+      const loan = o.cur === fc && m.scenario.startsWith("kap") && E.loanLimit(m, p) >= short ? Math.ceil(short) : 0;
+      if (!list.length && !loan) return bankrupt(p, id, a, o), false;
+      let pick;
+      if (p.isBot) pick = loan ? "loan" : list[0];
+      else {
+        pick = await dialog({
+          title: t("g.noFunds"), sub: t("g.sellToPay"),
+          rows: [[t("g.toPay"), fmt(o.amount, o.cur)], [t("g.missing"), fmt(short, o.cur)], [t("game.balance"), m.currencies.map((c) => fmt(p.wallet.get(c), c)).join(" · ")]],
+          buttons: [...(loan ? [{ label: `${t("g.takeLoan")} · ${fmt(loan, fc)}`, value: "loan", primary: true, testid: "rent-loan-btn" }] : []),
+            ...list.map((h) => ({ label: `${t("g.sellBank")}: ${nm(h)} · +${fmt(E.holdingValue(m, h, p), unitCur())}`, value: h, testid: `sell-holding-${h}-btn` }))],
+          closable: false,
+        });
+      }
+      if (pick === "loan") E.takeLoan(m, p, loan);
+      else if (pick) E.sellHolding(m, p, pick);
+      m.changed();
+    }
+    return false;
+  };
+  // Pays everything left, then restarts from «Исток» on benefit (minimal rent only)
+  const bankrupt = (p, id, a, o) => {
+    E.allIn(m, p, o.cur);
+    const left = p.wallet.get(o.cur);
+    if (left > 0) E.perform(m, p, id, a, { cur: o.cur, amount: left });
+    m.turnState.due = null;
+    p.bankruptcies = (p.bankruptcies || 0) + 1;
+    p.recordMove("c0", p.ring);
+    p.status = "benefit";
+    m.log({ key: "h.bankrupt", playerId: p.id, params: { name: p.name } });
+    placeTokens();
   };
 
   const noFunds = async (p, o, a) => {
@@ -913,14 +957,6 @@
       const pick = botPick(b, acts);
       if (!pick) break;
       await wait(500);
-      if (pick.a.mandatory && pick.o && !b.wallet.has(pick.o.cur, pick.o.amount) && pick.a.id === "payRent") {
-        const short = pick.o.amount - b.wallet.get(pick.o.cur);
-        if (!(E.loanLimit(m, b) >= short && E.takeLoan(m, b, Math.ceil(short)))) {
-          writeOff(b, pick.o);
-          m.changed();
-          break;
-        }
-      }
       await runAction(b, b.cell, pick.a, pick.o);
       if (!m.turnState.due && stage === "pre") break;
     }

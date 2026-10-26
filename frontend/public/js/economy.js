@@ -136,10 +136,14 @@
   const kapPropertyValue = (m, p) =>
     Object.entries(m.cells).filter(([id, s]) => model(m, id) === "kap" && soleOwner(s) === p.id).reduce((a, [id, s]) => a + propValue(m, id, s), 0);
   const ownedCells = (m, p) => Object.entries(m.cells).filter(([, s]) => s.owners[p.id]).map(([id]) => id);
+  // Private (Kapmonia) or shared people's (Narmonia) property the player can sell to the bank
+  const holdings = (m, p) => Object.keys(m.cells).filter((id) => {
+    const s = m.cells[id];
+    const mdl = model(m, id);
+    return (mdl === "kap" && s.type !== "people" && soleOwner(s) === p.id) || (mdl === "nar" && s.type === "shared" && s.owners[p.id] > 0);
+  });
   const refreshBenefit = (m, p) => {
-    if (!m.rules.benefit) return;
-    const has = Object.entries(m.cells).some(([id, s]) => model(m, id) === "kap" && soleOwner(s) === p.id);
-    p.status = has ? "active" : "benefit";
+    p.status = holdings(m, p).length ? "active" : "benefit";
   };
 
   /* ----- money helpers ----- */
@@ -184,7 +188,7 @@
         if (stage === "post" && !did("decline")) add({ id: "decline", label: L("decline") });
       } else if (owner && owner !== p.id) {
         if (due) {
-          const rent = p.status === "benefit" ? rentFor(m, id, 0) : rentFor(m, id);
+          const rent = p.status === "benefit" ? rentFor(m, id, 0) : rentFor(m, id); // on benefit: minimal rent only
           add({ id: "payRent", rent: true, key: "rentMax", fiat: rent, label: L("payRent"), opts: payOpts(m, rent), mandatory: true });
           if (s.tender && c.build && !s.dome && !improveBlocked(m, id) && !did("tender")) add({ id: "tender", label: L("tender"), mandatory: true });
         }
@@ -215,7 +219,7 @@
         add({ id: "jointBuy", label: L("jointBuy") });
         if (!did("publicBuild")) add({ id: "publicBuild", label: L("publicBuild") });
       } else {
-        if (due) tariffs(m, id).forEach((r, i) => add({ id: "narRent", rent: true, tariff: i, key: r.key, n: r.n, fiat: r.fiat, label: L(r.n === 1 ? "rentMod1" : r.key, { n: r.n }), opts: payOpts(m, r.fiat), mandatory: true }));
+        if (due) tariffs(m, id).forEach((r, i) => (p.status !== "benefit" || i === 0) && add({ id: "narRent", rent: true, tariff: i, key: r.key, n: r.n, fiat: r.fiat, label: L(r.n === 1 ? "rentMod1" : r.key, { n: r.n }), opts: payOpts(m, r.fiat), mandatory: true }));
         const kind = c.build && !s.dome && !improveBlocked(m, id) ? (s.modules < 4 ? "module" : domeAllowed(m, p, id, "nar") ? "dome" : null) : null;
         if (kind && s.type === "shared" && owner === p.id) add({ id: kind, label: L(kind), opts: payOpts(m, buildCost(m, id, kind)), mandatory: due });
         else if (kind && s.type === "shared" && !did("sharedBuild")) add({ id: "sharedBuild", kind, label: `${L(kind)} · ${L("sharedVote")}`, mandatory: due });
@@ -527,6 +531,47 @@
     else Object.assign(s, { type: "free", owners: {}, modules: 0, dome: false, mortgaged: false, tender: false });
     refreshBenefit(m, p);
   };
+  /* ----- paying rent without enough money ----- */
+  const holdingValue = (m, id, p) => (model(m, id) === "kap" ? sellPrice(m, id) : Math.round((shareValue(m, id) * (st(m, id).owners[p.id] || 0) * SP.sellToBankPercent) / 100));
+  const sellHolding = (m, p, id) => {
+    if (model(m, id) === "kap") return sellToBank(m, p, id);
+    const s = st(m, id);
+    const amount = holdingValue(m, id, p);
+    const cur = fiatCur(m);
+    m.credit(p, cur, cur === "nar" ? m.bank.usdToNar(amount) : amount, "h.sellShare", { cell: "#" + id });
+    const rest = Object.keys(s.owners).filter((k) => k !== p.id);
+    if (s.spent) delete s.spent[p.id];
+    if (rest.length) s.owners = Object.fromEntries(rest.map((k) => [k, 1 / rest.length]));
+    else Object.assign(s, { type: "free", owners: {}, modules: 0, dome: false, spent: {}, fund: {} });
+    refreshBenefit(m, p);
+  };
+  const ceil2 = (n) => Math.ceil(n * 100 - 1e-9) / 100;
+  const otherCur = (m, cur) => (m.scenario === "kap_nar" ? (cur === "nar" ? "usd" : "nar") : null);
+  // Money still missing for opt after converting the other currency at the gold price
+  const shortfall = (m, p, opt) => {
+    const o = otherCur(m, opt.cur);
+    const extra = !o ? 0 : o === "nar" ? p.wallet.get("nar") * m.bank.goldPrice : m.bank.usdToNar(p.wallet.get("usd"));
+    return Math.max(0, r2(opt.amount - p.wallet.get(opt.cur) - extra));
+  };
+  // Top up the chosen currency from the other one (rent can always be paid in $ or Narmonit)
+  const cover = (m, p, opt) => {
+    if (p.wallet.has(opt.cur, opt.amount)) return true;
+    const o = otherCur(m, opt.cur);
+    if (!o || shortfall(m, p, opt) > 0) return false;
+    const short = r2(opt.amount - p.wallet.get(opt.cur));
+    const need = Math.min(p.wallet.get(o), o === "nar" ? ceil2(short / m.bank.goldPrice) : Math.ceil(short * m.bank.goldPrice));
+    p.wallet.sub(o, need);
+    p.wallet.add(opt.cur, short);
+    m.log({ key: "h.cover", playerId: p.id, money: [{ cur: o, amount: -need }, { cur: opt.cur, amount: short }] });
+    return true;
+  };
+  const allIn = (m, p, cur) => {
+    const o = otherCur(m, cur);
+    const have = o ? p.wallet.get(o) : 0;
+    if (!have) return;
+    p.wallet.sub(o, have);
+    p.wallet.add(cur, o === "nar" ? r2(have * m.bank.goldPrice) : m.bank.usdToNar(have));
+  };
   const loanLimit = (m, p) => Math.max(0, kapPropertyValue(m, p) - p.loans.reduce((a, l) => a + l.principal, 0));
   const takeLoan = (m, p, amount) => {
     if (amount <= 0 || amount > loanLimit(m, p)) return false;
@@ -640,6 +685,6 @@
   window.MPEco = {
     L, model, zone, fiatCur, SP, fiatOf, payOpts, canPayAny, st, price, buildCost, rentFor, tariffs, level, soleOwner, propValue, kapPropertyValue,
     ownedCells, actions, perform, auctionWin, jointBuy, publicBuild, sharedBuild, sharedPlan, canConvert, convertRefunds, convertShared, shareOffers, buyShare, markDone, didAct, mortgage, sellPrice, sellToBank, loanLimit, takeLoan, repayLoans,
-    onLand, onRound, everyTurnStart, statusLabel, refreshBenefit,
+    onLand, onRound, everyTurnStart, statusLabel, refreshBenefit, holdings, holdingValue, sellHolding, shortfall, cover, allIn,
   };
 })();

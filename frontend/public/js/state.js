@@ -40,6 +40,7 @@
       this.stats = d.stats || { build: 0, life: 0, builds: 0 };
       this.turnsTaken = d.turnsTaken || 0;
       this.rentIncome = d.rentIncome || 0;
+      this.bankruptcies = d.bankruptcies || 0;
       this.ring = d.ring || 1;
       this.moves = d.moves || [];
       this.status = d.status || "active"; // active | benefit | bankrupt
@@ -56,8 +57,8 @@
       this.moves = [...this.moves, { cell, ring }].slice(-10);
     }
     toJSON() {
-      const { id, idx, name, color, isBot, botType, cell, ring, moves, status, doubles, restrictions, loans, props, wallet, stats, turnsTaken, rentIncome } = this;
-      return { id, idx, name, color, isBot, botType, cell, ring, moves, status, doubles, restrictions, loans, props, wallet, stats, turnsTaken, rentIncome };
+      const { id, idx, name, color, isBot, botType, cell, ring, moves, status, doubles, restrictions, loans, props, wallet, stats, turnsTaken, rentIncome, bankruptcies } = this;
+      return { id, idx, name, color, isBot, botType, cell, ring, moves, status, doubles, restrictions, loans, props, wallet, stats, turnsTaken, rentIncome, bankruptcies };
     }
   }
 
@@ -115,7 +116,7 @@
       const m = new Match({
         scenario,
         currencies,
-        players: players.map((p) => new Player({ ...p, wallet: rules.start, status: rules.benefit ? "benefit" : "active" })),
+        players: players.map((p) => new Player({ ...p, wallet: rules.start, status: "benefit" })),
       });
       m.log({ key: "h.created", params: { scenario: `@scn.${scenario}.name` } });
       m.players.forEach((p) => m.log({ key: "h.start", playerId: p.id, money: Object.entries(rules.start).map(([cur, amount]) => ({ cur, amount })) }));
@@ -132,6 +133,7 @@
     log(e) { return this.history.add({ turnNo: this.turnNo, roundNo: this.roundNo, ...e }); }
 
     changed() {
+      if (window.MPEco) this.players.forEach((p) => window.MPEco.refreshBenefit(this, p)); // «на пособии» = no private / shared property
       this.save();
       this.dispatchEvent(new Event("change"));
     }
