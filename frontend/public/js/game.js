@@ -79,6 +79,9 @@
     "g.otherActs": ["Другие действия", "Інші дії", "Other actions"], "g.weight": ["Доля голоса", "Частка голосу", "Vote weight"],
     "g.coOwners": ["Средства долевиков", "Кошти пайовиків", "Co-owners' funds"], "g.yourPart": ["Ваша часть", "Ваша частина", "Your part"],
     "g.convert": ["Голосование: перевести в народную", "Голосування: перевести в народну", "Vote: convert to people's property"],
+    "g.rentDice1": ["Аренда (2–4 / 5–8 / 9–12), 1 поле", "Оренда (2–4 / 5–8 / 9–12), 1 поле", "Rent (2–4 / 5–8 / 9–12), 1 field"],
+    "g.rentDice2": ["Аренда при Квантале и Айсайте", "Оренда при Квантал і Айсайт", "Rent with Kvantal and Icite"],
+    "g.rentStations": ["Аренда за 1 / 2 / 3 / 4 станции", "Оренда за 1 / 2 / 3 / 4 станції", "Rent for 1 / 2 / 3 / 4 stations"],
     "g.buyShare": ["Выкупить долю", "Викупити частку", "Buy a share"],
     "h.shareBought": ["Выкуплена доля {share} в {cell}", "Викуплено частку {share} у {cell}", "Bought a {share} share of {cell}"],
     "h.shareSold": ["Продажа доли {share} в {cell} → {to}:", "Продаж частки {share} у {cell} → {to}:", "Share {share} of {cell} sold → {to}:"],
@@ -176,7 +179,7 @@
     if (c.kind === "chance") body = `<span class="glyph glyph--chance">?</span>`;
     else if (c.kind === "borgi") body = `<span class="glyph glyph--borgi">ᗑ</span>`;
     else if (c.kind === "station") body = `<span class="glyph glyph--station"></span>`;
-    else if (c.kind === "tax" || c.kind === "grant") body = `<span class="glyph glyph--ship">✦</span>`;
+    else if (c.kind === "utility") body = `<span class="glyph glyph--ship">✦</span>`;
     else body = `<img src="/assets/img/${a.img}.png" alt="" style="${a.hue ? `filter:hue-rotate(${a.hue}deg)` : ""}" />`;
     return `<span class="cell-ring">1${c.ring}</span>${body}<span class="cell-marks"></span>`;
   };
@@ -361,6 +364,10 @@
     const cur = m.scenario === "nar_nar" ? "usd" : fc;
     const rows = [[t("g.price"), fmt(E.price(m, id), cur)]];
     if (c.build) rows.push([t("g.module"), fmt(E.buildCost(m, id), cur)], [t("g.dome"), fmt(E.buildCost(m, id, "dome"), cur)]);
+    if (c.kind === "utility") {
+      const r = c.rent;
+      rows.push([t("g.rentDice1"), r.one.map((x) => fmt(m.bank.fiat(x), cur)).join(" / ")], [t("g.rentDice2"), r.both.map((x) => fmt(m.bank.fiat(x), cur)).join(" / ")]);
+    } else if (c.kind === "station") rows.push([t("g.rentStations"), c.rent.map((x) => fmt(m.bank.fiat(x), cur)).join(" / ")]);
     if (Object.keys(s.owners).length || mdl === "gos") rows.push([t("g.rent"), fmt(E.rentFor(m, id), cur)]);
     if (c.build) rows.push([t("g.buildings"), `${s.dome ? 5 : s.modules} / 5`]);
     return rows;
@@ -747,15 +754,34 @@
         <strong data-testid="result-points-${r.p.color}">${r.points}<small>/12</small></strong></header>${cat(r, "build")}${cat(r, "life")}${cat(r, "capital")}</article>`).join("")}</div>`;
     window.MPApp.go("results");
   };
+  // Sound + fullscreen items shared by the game menu and the mobile site menu
+  const commonItems = () => [
+    ...(window.MPFullscreen && window.MPFullscreen.supported ? [{ label: t(window.MPFullscreen.active ? "fs.exit" : "fs.enter"), value: "fs", testid: "menu-fullscreen-btn" }] : []),
+    { label: t(window.MPSound.on ? "snd.turnOff" : "snd.turnOn"), value: "sound", testid: "menu-sound-btn" },
+  ];
+  const commonAction = (v) => {
+    if (v === "sound") return toggleSound() || true;
+    if (v === "fs") return window.MPFullscreen.toggle() || true;
+    return false;
+  };
+  const siteMenu = async () => {
+    const v = await dialog({ title: t("game.menu"), buttons: [
+      { label: t("nav.newGame"), value: "setup", testid: "site-menu-new-game-btn" }, { label: t("nav.rules"), value: "rules", testid: "site-menu-rules-btn" },
+      { label: t("nav.policy"), value: "policy", testid: "site-menu-policy-btn" }, ...commonItems(),
+      { label: t("g.back"), value: null, primary: true, testid: "site-menu-back-btn" }] });
+    if (commonAction(v)) return;
+    if (v === "setup") return window.MPApp.go("setup");
+    if (v === "rules" || v === "policy") return dialog({ title: t(`${v}.title`), html: `<div class="modal-body">${t(`${v}.body`)}</div>`, buttons: [{ label: t("common.ok"), value: true }] });
+  };
   const gameMenu = async () => {
     const v = await dialog({ title: t("game.menu"), buttons: [
       { label: t("game.finish"), value: "finish", testid: "menu-finish-btn" }, { label: t("game.bonus"), value: "bonus", testid: "menu-bonus-btn" },
       ...(m.scenario === "kap_nar" ? [{ label: t("g.exchange"), value: "exchange", testid: "menu-exchange-btn" }] : []),
-      { label: t(window.MPSound.on ? "snd.turnOff" : "snd.turnOn"), value: "sound", testid: "menu-sound-btn" },
+      ...commonItems(),
       { label: t("nav.rules"), value: "rules", testid: "menu-rules-btn" }, { label: t("menu.home"), value: "home", testid: "menu-home-btn" },
       { label: t("g.back"), value: null, primary: true, testid: "menu-back-btn" }] });
     if (v === "exchange") return myTurn(m.current) ? exchange(m.current) : window.MPApp.toast(t("net.yourTurnOnly"), "error");
-    if (v === "sound") return toggleSound();
+    if (commonAction(v)) return;
     if (v === "finish") return net() && net().seat !== 0 ? window.MPApp.toast(t("net.hostOnly"), "error") : finishGame();
     if (v === "bonus") return net() && !isDriver() ? window.MPApp.toast(t("net.yourTurnOnly"), "error") : adBonus();
     if (v === "rules") return dialog({ title: t("rules.title"), html: `<div class="modal-body">${t("rules.body")}</div>`, buttons: [{ label: t("common.ok"), value: true }] });
@@ -900,7 +926,7 @@
     const s = m.cells[id];
     const mdl = E.model(m, id);
     if (id === "c10") return -5;
-    if (!mdl) return B.cells[id].kind === "grant" ? 2 : B.cells[id].kind === "tax" ? -2 : 0;
+    if (!mdl) return 0;
     if (!s || s.type === "free") return b.botType === "capitalist" ? 3 : 2;
     if (s.owners[b.id]) return 2;
     return b.botType === "narmonist" && mdl === "nar" ? 1 : -E.rentFor(m, id) / 50;
@@ -1006,6 +1032,8 @@
   });
 
   window.MPGame = {
+    menu: () => gameMenu(),
+    siteMenu: () => siteMenu(),
     attach(match) {
       const same = m && m.id === match.id;
       m = match;

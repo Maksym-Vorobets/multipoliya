@@ -29,7 +29,7 @@
   };
 
   /* ----- model & currency ----- */
-  const model = (m, id) => (["planet", "station"].includes(B.cells[id].kind) ? zone(m, id) : null);
+  const model = (m, id) => (["planet", "station", "utility"].includes(B.cells[id].kind) ? zone(m, id) : null);
   // Economic model of the board zone (also used for Chance/Borgi decks)
   const zone = (m, id) => {
     const c = B.cells[id];
@@ -69,16 +69,29 @@
   const rentFor = (m, id, lvl) => {
     const c = B.cells[id];
     const s = st(m, id);
-    if (c.kind === "station") {
-      const owner = soleOwner(s);
-      const count = owner ? Object.keys(m.cells).filter((k) => B.cells[k].kind === "station" && soleOwner(m.cells[k]) === owner).length : 1;
-      return m.bank.fiat(c.rent[Math.min(3, Math.max(0, count - 1))]);
+    if (c.kind === "station" || c.kind === "utility") {
+      const count = Math.max(1, B.setCells(c.kind, c.ring).filter((k) => sameHolding(m, id, k)).length);
+      if (c.kind === "station") return m.bank.fiat(c.rent[Math.min(3, count - 1)]);
+      const sum = (m.lastRoll && m.lastRoll.sum) || 7;
+      return m.bank.fiat((count >= 2 ? c.rent.both : c.rent.one)[sum <= 4 ? 0 : sum <= 8 ? 1 : 2]);
     }
     const t = B.rentTable(c);
     const L_ = lvl ?? level(s);
     let base = L_ === 5 ? t.dome : t.modules[L_];
     if (L_ === 0 && groupComplete(m, id)) base = t.double;
     return m.bank.fiat(base);
+  };
+  // Same holding = same form of ownership AND the same owner(s); people's ≠ shared even with identical players
+  const sameHolding = (m, a, b) => {
+    const x = st(m, a);
+    const y = st(m, b);
+    const mdl = model(m, a);
+    if (mdl !== model(m, b)) return false;
+    if (mdl === "gos") return !!x.built && !!y.built;
+    if (!Object.keys(x.owners).length || x.type !== y.type) return false;
+    if (mdl === "kap") return !!soleOwner(x) && soleOwner(x) === soleOwner(y);
+    const ka = Object.keys(x.owners).sort().join();
+    return ka === Object.keys(y.owners).sort().join();
   };
   const groupComplete = (m, id) => {
     const c = B.cells[id];
@@ -97,15 +110,14 @@
   const sameKindGroup = (m, id) => {
     const c = B.cells[id];
     if (c.group == null) return false;
-    const type = st(m, id).type;
-    return B.groupCells(c.group, c.ring).every((g) => model(m, g) === "nar" && st(m, g).type === type && Object.keys(st(m, g).owners).length > 0);
+    return B.groupCells(c.group, c.ring).every((g) => model(m, g) === "nar" && sameHolding(m, id, g));
   };
   // Narmonia rent choices: only what is actually built on the cell
   const tariffs = (m, id) => {
     const s = st(m, id);
     const t = B.rentTable(B.cells[id]);
     const f = (x) => m.bank.fiat(x);
-    if (B.cells[id].kind === "station") return [{ key: "rentTariff", fiat: rentFor(m, id) }];
+    if (["station", "utility"].includes(B.cells[id].kind)) return [{ key: "rentTariff", fiat: rentFor(m, id) }];
     const list = [{ key: "rentTariff", fiat: f(t.base) }];
     if (sameKindGroup(m, id)) list.push({ key: "rentDoubleT", fiat: f(t.double) });
     for (let n = 1; n <= s.modules; n++) list.push({ key: "rentMods", n, fiat: f(t.modules[n]) });
@@ -190,7 +202,7 @@
         if (!s.built) add({ id: "gosBuild", label: L("gosBuild"), opts: gos, mandatory: due });
         else if (s.modules < 4) add({ id: "module", label: L("module"), opts: gos, mandatory: due });
         else if (!s.dome && domeAllowed(m, p, id, "gos")) add({ id: "dome", label: L("dome"), opts: gos, mandatory: due });
-      } else if (c.kind === "station" && !s.built) add({ id: "gosBuild", label: L("gosBuild"), opts: gos, mandatory: due });
+      } else if (["station", "utility"].includes(c.kind) && !s.built) add({ id: "gosBuild", label: L("gosBuild"), opts: gos, mandatory: due });
     }
 
     if (mdl === "nar") {
@@ -536,12 +548,6 @@
     if (mdl === "kap" && s.type !== "free" && soleOwner(s) !== p.id && s.collect && !s.mortgaged) t.due = { id };
     if (mdl === "gos") t.due = { id };
     if (mdl === "nar" && Object.keys(s.owners).length && soleOwner(s) !== p.id) t.due = { id };
-    if (c.kind === "tax") {
-      const cur = nar ? "nar" : fiatCur(m);
-      const amount = nar ? Math.min(SP.kvantalNar, p.wallet.nar) : Math.round((p.wallet.get(cur) * SP.kvantalPercent) / 100);
-      if (amount > 0) m.debit(p, cur, amount, "h.tax", { cell: "#" + id });
-    }
-    if (c.kind === "grant") m.credit(p, nar ? "nar" : fiatCur(m), nar ? SP.iciteGrantNar : m.bank.fiat(SP.iciteGrant), "h.grant", { cell: "#" + id });
     if (id === "c20" && ["kap_nar", "nar_nar"].includes(m.scenario)) m.credit(p, "nar", SP.narmonyonNar, "h.narmonyon");
     if (id === "c10" && p.restrictions.patch > 0) {
       p.restrictions.patch -= 1;

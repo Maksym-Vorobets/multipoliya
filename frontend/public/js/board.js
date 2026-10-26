@@ -70,10 +70,9 @@
         key = ring === 2 ? outer : inner;
         kind = key;
       } else if (STATIONS.includes(token)) kind = "station";
-      else if (token === "kvantal") kind = "tax";
-      else if (token === "icite") kind = "grant";
+      else if (token === "kvantal" || token === "icite") kind = "utility";
       const c = { id, pos, ring, kind, key, label: token.replace("_", " ").toUpperCase() };
-      if (kind === "planet" || kind === "station") {
+      if (kind === "planet" || kind === "station" || kind === "utility") {
         const row = PRICE[`${key}-1${ring}`];
         Object.assign(c, { price: row.price, build: row.module, dome: row.dome, rent: row.rent });
         if (kind === "planet") c.group = groupOf[key];
@@ -84,6 +83,8 @@
   }
 
   const groupCells = (gi, ring) => Object.values(cells).filter((c) => c.group === gi && c.ring === ring).map((c) => c.id);
+  // Stations (4) and utilities (Kvantal + Icite) form a group inside their own ring
+  const setCells = (kind, ring) => Object.values(cells).filter((c) => c.kind === kind && c.ring === ring).map((c) => c.id);
 
   // Route graph: each step goes straight (next cell on the same ring) or sideways (other ring, same column).
   // No backward or diagonal moves. From a corner the player may enter either ring.
@@ -138,5 +139,5 @@
   };
   const rentTable = (c) => ({ base: c.rent[0], double: c.rent[0] * 2, modules: c.rent.slice(0, 5), dome: c.rent[5] });
 
-  window.MPBoard = { cells, groupOf, order, GROUPS, CORNERS, next, reachable, forwardTo, groupCells, name, art, rentTable, STATIONS };
+  window.MPBoard = { cells, groupOf, order, GROUPS, CORNERS, next, reachable, forwardTo, groupCells, setCells, name, art, rentTable, STATIONS };
 })();

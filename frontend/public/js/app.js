@@ -254,7 +254,7 @@
       $(".lang").classList.remove("is-open");
       return window.I18N.setLang(el.dataset.lang);
     }
-    if (el.id === "burger") return document.body.classList.toggle("menu-open");
+    if (el.id === "burger") return ui.screen === "game" && ui.match ? window.MPGame.menu() : window.MPGame.siteMenu();
     if (el.dataset.mode) {
       ui.mode = el.dataset.mode;
       if (ui.mode === "online") ui.real = Math.max(2, ui.real);

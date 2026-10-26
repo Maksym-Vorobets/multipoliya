@@ -60,15 +60,20 @@ window.MPPrices = {
     "makemake-12": { price: 420, module: 240, dome: 192, rent: [42, 147, 483, 1155, 1470, 1680] },
     "eris-11": { price: 350, module: 200, dome: 160, rent: [35, 122, 402, 962, 1225, 1400] },
     "eris-12": { price: 420, module: 240, dome: 192, rent: [42, 147, 483, 1155, 1470, 1680] },
-    // stations: rent by number of stations owned by the same owner (1..4)
-    "orion-11": { price: 200, rent: [25, 50, 100, 200] },
-    "orion-12": { price: 240, rent: [30, 60, 120, 240] },
-    "pegasus-11": { price: 200, rent: [25, 50, 100, 200] },
-    "pegasus-12": { price: 240, rent: [30, 60, 120, 240] },
-    "kiola-11": { price: 200, rent: [25, 50, 100, 200] },
-    "kiola-12": { price: 240, rent: [30, 60, 120, 240] },
-    "vega-11": { price: 200, rent: [25, 50, 100, 200] },
-    "vega-12": { price: 240, rent: [30, 60, 120, 240] },
+    // stations: one group of 4 per ring, rent by number held in the same form by the same owner(s) (1..4)
+    "orion-11": { price: 200, rent: [36, 60, 120, 240] },
+    "orion-12": { price: 240, rent: [36, 60, 120, 240] },
+    "pegasus-11": { price: 200, rent: [36, 60, 120, 240] },
+    "pegasus-12": { price: 240, rent: [36, 60, 120, 240] },
+    "kiola-11": { price: 200, rent: [36, 60, 120, 240] },
+    "kiola-12": { price: 240, rent: [36, 60, 120, 240] },
+    "vega-11": { price: 200, rent: [36, 60, 120, 240] },
+    "vega-12": { price: 240, rent: [36, 60, 120, 240] },
+    // utilities (Kvantal + Icite): rent by dice sum 2–4 / 5–8 / 9–12; one held vs both held
+    "kvantal-11": { price: 204, rent: { one: [36, 60, 96], both: [60, 120, 180] } },
+    "kvantal-12": { price: 204, rent: { one: [36, 60, 96], both: [60, 120, 180] } },
+    "icite-11": { price: 204, rent: { one: [36, 60, 96], both: [60, 120, 180] } },
+    "icite-12": { price: 204, rent: { one: [36, 60, 96], both: [60, 120, 180] } },
   },
   special: {
     blackHoleFine: 50, // $/₽; Narmonia: blackHoleFineNar g

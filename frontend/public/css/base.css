@@ -112,11 +112,10 @@ body[data-screen="game"] .topnav--game { display: flex; }
 .lang-list button { width: 100%; text-align: left; padding: 9px 12px; border: 0; background: none; border-radius: 6px; font-size: 0.88rem; }
 .lang-list button:hover, .lang-list button.is-active { background: var(--surface-2); color: var(--gold); }
 
-.fs-menu-item { display: none; }
 .fs-btn .fs-out { display: none; }
 body.is-fullscreen .fs-btn .fs-in { display: none; }
 body.is-fullscreen .fs-btn .fs-out { display: inline; }
-.fs-btn[hidden], .fs-menu-item[hidden] { display: none !important; }
+.fs-btn[hidden] { display: none !important; }
 .burger { display: none; width: 34px; height: 30px; border: 1px solid var(--line-cool); border-radius: 6px; background: transparent; padding: 6px; flex-direction: column; justify-content: space-between; }
 .burger span { height: 2px; background: var(--text-dim); border-radius: 2px; }
 
@@ -155,8 +154,9 @@ body.is-fullscreen .fs-btn .fs-out { display: inline; }
     background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 10px; gap: 4px;
   }
   body[data-screen="game"] .topnav--game { display: none; }
-  .fs-btn { display: none; }
-  .fs-menu-item { display: block; }
+  /* Mobile: one modal menu (burger) — no dropdown, no sound / fullscreen icons in the header */
+  .fs-btn, #btn-sound { display: none !important; }
+  body.menu-open .topnav--menu, body[data-screen="game"].menu-open .topnav--game { display: none; }
   body[data-screen="game"].menu-open .topnav--game {
     display: flex; flex-direction: column; position: absolute; top: var(--header-h); right: 12px;
     background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 10px;
