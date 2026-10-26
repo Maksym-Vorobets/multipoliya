@@ -232,7 +232,8 @@
     $("#center-title").textContent = `${cur.name} · ${window.MPBoard.name(cur.cell, window.I18N.lang)}`;
     $("#center-balance").textContent = `${t("game.yourBalance")}: ${balances(cur, " / ")}`;
     const r = m.lastRoll;
-    $("#roll-result").innerHTML = r ? `${r.a} + ${r.b} = ${r.sum}${r.double ? `<em>${t("game.double")}</em>` : ""}` : "";
+    const ur = m.turnState && m.turnState.utilRoll;
+    $("#roll-result").innerHTML = ur ? `${ur.a} + ${ur.b} = ${ur.sum}` : r ? `${r.a} + ${r.b} = ${r.sum}${r.double ? `<em>${t("game.double")}</em>` : ""}` : "";
     $("#history-list").innerHTML = m.history.recent(80).map(histItem).join("");
     $("#history-list").scrollTop = 1e6;
     window.MPGame.render();

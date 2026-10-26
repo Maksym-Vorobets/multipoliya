@@ -136,9 +136,19 @@
   let dlgResolve = null;
   let dlgValues = [];
   let dlgClosable = true;
-  const dialog = ({ title, sub, rows = [], html = "", buttons = [], closable = true }) =>
+  // Dialogs are queued: a second dialog never replaces (and orphans) the one that is open
+  const dlgQueue = [];
+  const dialog = (spec) =>
     new Promise((resolve) => {
-      dlgResolve = resolve;
+      dlgQueue.push({ spec, resolve });
+      if (!dlgResolve) nextDialog();
+    });
+  const nextDialog = () => {
+    const item = dlgQueue.shift();
+    if (!item) return;
+    const { title, sub, rows = [], html = "", buttons = [], closable = true } = item.spec;
+    {
+      dlgResolve = item.resolve;
       dlgValues = buttons.map((b) => b.value);
       dlgClosable = closable;
       $("#modal-title").textContent = title;
@@ -147,13 +157,15 @@
         ${rows.length ? `<dl class="dlg-rows">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join("")}</dl>` : ""}${html}
         <div class="dlg-btns">${buttons.map((b, i) => `<button class="btn ${b.primary ? "btn--primary" : ""}" data-dlg="${i}" ${b.disabled ? "disabled" : ""} data-testid="${b.testid || "dlg-btn-" + i}">${esc(b.label)}</button>`).join("")}</div>`;
       $("#modal").classList.add("is-open");
-    });
+    }
+  };
   const closeDialog = (value) => {
     $("#modal").classList.remove("is-open");
     $(".modal-x").style.display = "";
     const r = dlgResolve;
     dlgResolve = null;
     if (r) r(value);
+    if (dlgQueue.length) setTimeout(() => !dlgResolve && nextDialog(), 0);
   };
   document.addEventListener("click", (e) => {
     const b = e.target.closest("[data-dlg]");
@@ -454,11 +466,14 @@
     $("#rent-sum").textContent = rentSumText(rentSel.rents[i]);
     $$('[data-testid^="rent-pay-"]').forEach((b) => (b.disabled = false));
   };
+  let cellOpen = false;
   const openCell = async () => {
+    if (cellOpen) return;
     const p = m.current;
     const id = p.cell;
     const acts = E.actions(m, p, id, m.turnState.stage);
     if (!acts.length) return;
+    cellOpen = true;
     const rents = acts.filter((a) => a.rent);
     const others = acts.filter((a) => !a.rent);
     const unit = unitCur();
@@ -478,11 +493,19 @@
     });
     const mustAct = !!m.turnState.due;
     if (!mustAct) buttons.push({ label: t("g.back"), value: null, testid: "cell-back-btn" });
-    const res = await dialog({ title: nm(id), sub: E.statusLabel(m, id), rows: cellRows(id), html, buttons, closable: !mustAct });
-    rentSel = null;
-    if (res) await runAction(p, id, res.a, res.o);
+    let res = null;
+    try {
+      res = await dialog({ title: nm(id), sub: E.statusLabel(m, id), rows: cellRows(id), html, buttons, closable: !mustAct });
+      rentSel = null;
+      if (res) await runAction(p, id, res.a, res.o);
+    } catch (err) {
+      console.error("cell action failed", err);
+    } finally {
+      cellOpen = false;
+    }
     refresh();
-    if (m.turnState.due && !p.isBot) setTimeout(openCell, 150);
+    // after the rent roll (or any unfinished obligation) go straight back to the cell dialog
+    if (m.turnState.due && m.current === p && !p.isBot) setTimeout(openCell, res && res.a.id === "utilRoll" ? 0 : 150);
   };
 
   const VOTED = ["publicBuild", "publicModule", "sharedBuild"];
