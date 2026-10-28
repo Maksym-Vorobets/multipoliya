@@ -91,6 +91,7 @@
     "h.sellShare": ["Доля {cell} продана банку:", "Частку {cell} продано банку:", "Share of {cell} sold to the bank:"],
     "h.bankrupt": ["{name} — банкрот: отдано всё, возврат на «Исток», статус «На пособии»", "{name} — банкрут: віддано все, повернення на «Витік», статус «На допомозі»", "{name} is bankrupt: everything paid, back to the start, status: benefit"],
     "g.exchangeOnlyKapNar": ["Обмен валют доступен в сценарии «Капмония / Нармония»", "Обмін валют доступний у сценарії «Капмонія / Нармонія»", "Currency exchange is available in the Kapmonia / Narmonia scenario"],
+    "r.bankruptcies": ["Банкротства", "Банкрутства", "Bankruptcies"], "r.noPoints": ["не влияет на очки", "не впливає на бали", "does not affect points"],
     "g.sellShare": ["Продать долю", "Продати частку", "Sell share"],
     "g.sellShareHint": ["Сначала долю предложат совладельцам. Если никто не купит — банк выкупит всё поле у всех совладельцев (100 % в нармоните), и оно станет народным.", "Спочатку частку запропонують співвласникам. Якщо ніхто не купить — банк викупить усе поле в усіх співвласників (100 % у нармоніті), і воно стане народним.", "The share is first offered to co-owners. If nobody buys, the bank buys out the whole cell from all co-owners (100 % in Narmonit) and it becomes people's property."],
     "g.shareOffer": ["Предложение: выкуп доли", "Пропозиція: викуп частки", "Offer: buy a share"],
@@ -871,7 +872,8 @@
     $("#results-body").innerHTML = `<p class="sub" data-testid="results-verdict">${res.draw ? t("r.draw") : t("r.winner")}: <b class="gold">${esc(res.rows.filter((r) => r.winner).map((r) => r.p.name).join(", "))}</b></p>
       <div class="res-grid">${res.rows.map((r, i) => `<article class="panel res-card${r.winner ? " is-winner" : ""}" data-testid="result-card-${r.p.color}" style="animation-delay:${i * 90}ms">
         <header><img src="/assets/img/token-${r.p.color}.png" alt="" /><div><h3>${esc(r.p.name)}</h3>${r.winner ? `<span class="res-badge">${res.draw ? t("r.draw") : t("r.winner")}</span>` : ""}</div>
-        <strong data-testid="result-points-${r.p.color}">${r.points}<small>/12</small></strong></header>${cat(r, "build")}${cat(r, "life")}${cat(r, "capital")}</article>`).join("")}</div>`;
+        <strong data-testid="result-points-${r.p.color}">${r.points}<small>/12</small></strong></header>${cat(r, "build")}${cat(r, "life")}${cat(r, "capital")}
+        <div class="res-metric res-metric--plain" data-testid="result-bankruptcies-${r.p.color}"><span>${t("r.bankruptcies")}</span><b class="${r.p.bankruptcies ? "res-bad" : ""}">${r.p.bankruptcies || 0}</b><em>${t("r.noPoints")}</em></div></article>`).join("")}</div>`;
     window.MPApp.go("results");
   };
   // Sound + fullscreen items shared by the game menu and the mobile site menu

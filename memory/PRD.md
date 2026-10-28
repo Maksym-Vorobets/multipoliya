@@ -66,3 +66,4 @@ Build the browser PWA game «Мультиполия» from the spec (Техни�
 - Utilities (Kvantal/Icite, 204$) and stations: setRent()/setGroup(); group stacking: people≠shared, shared stack if owner overlap >=50%; utility dice tariffs 36/60/96/120 | 72/120/180/240; stations 36/60/120/240; nar = choose min..max; kap benefit = min w/o roll; gos → bank (bankRent), gos_gos = min in ₽. 4-row card.
 - Rent shortfall: other currency at gold price → loan/sell holdings → bankruptcy (pay all, back to Исток c0, status benefit). Status «на пособии» = no private/shared property → minimal rent.
 - Dialog queue (no orphaned dialogs), openCell try/catch + immediate reopen after rent roll; SW v7 fetch no-cache.
+- 2026-06: Results screen shows each player's bankruptcy counter (result-bankruptcies-<color>), informational only, does not affect points. Self-tested via screenshot.

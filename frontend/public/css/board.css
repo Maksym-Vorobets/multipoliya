@@ -166,6 +166,9 @@
 .res-metric span { color: var(--text-dim); font-size: 0.8rem; }
 .res-metric b { text-align: right; }
 .res-metric em { grid-column: 1 / -1; font-style: normal; font-size: 0.72rem; color: var(--sky); }
+.res-metric--plain { background: transparent; border: 1px dashed var(--line-cool); }
+.res-metric--plain em { color: var(--text-dim); }
+.res-metric b.res-bad { color: var(--danger); }
 .results-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 
 /* Route preview */
