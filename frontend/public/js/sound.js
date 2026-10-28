@@ -42,6 +42,10 @@
     click: () => tone(720, 0.07, { type: "triangle", vol: 0.06, to: 540 }),
     select: () => { tone(880, 0.08, { vol: 0.07 }); tone(1320, 0.09, { vol: 0.04, at: 0.05 }); },
     step: () => { noise(0.05, { vol: 0.12, freq: 900, q: 2 }); tone(300, 0.06, { type: "sine", vol: 0.05, to: 180 }); },
+    bankrupt: () => {
+      [523, 415, 330, 262].forEach((f, i) => tone(f, 0.28, { type: "sawtooth", vol: 0.05, at: i * 0.18, to: f * 0.94 }));
+      noise(0.5, { vol: 0.12, at: 0.72, freq: 300, q: 0.8 });
+    },
     dice: () => {
       // shake + a few bounces that decay
       for (let i = 0; i < 6; i++) noise(0.04, { vol: 0.18, at: i * 0.05, freq: 2400 + Math.random() * 1500, q: 3 });

@@ -197,3 +197,13 @@
 /* Online: connection banner */
 .net-banner { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 16px; border-radius: 999px; background: rgba(60, 14, 22, 0.92); border: 1px solid var(--danger); font-size: 0.85rem; font-weight: 700; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); animation: screenIn var(--t) var(--ease); }
 .net-banner[hidden] { display: none; }
+
+/* Bankruptcy announcement */
+.announce { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; pointer-events: none; opacity: 0; transition: opacity 260ms var(--ease); }
+.announce.is-on { opacity: 1; pointer-events: auto; background: radial-gradient(circle at center, rgba(120, 16, 30, 0.35), rgba(0, 0, 0, 0.55)); }
+.announce-card { display: flex; align-items: center; gap: 18px; max-width: min(560px, 92vw); padding: 22px 26px; border-radius: var(--radius); background: rgba(40, 8, 16, 0.96); border: 1px solid var(--danger); box-shadow: 0 0 0 1px rgba(239, 91, 107, 0.25), 0 24px 60px rgba(0, 0, 0, 0.6); transform: scale(0.92); transition: transform 320ms var(--ease); }
+.announce.is-on .announce-card { transform: scale(1); }
+.announce-icon { flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: var(--danger); color: #1a0508; font-size: 1.8rem; font-weight: 900; animation: announcePulse 1.2s ease-in-out infinite; }
+@keyframes announcePulse { 50% { box-shadow: 0 0 0 10px rgba(239, 91, 107, 0.18); } }
+.announce-card b { display: block; font-size: 1.35rem; color: var(--danger); letter-spacing: 0.02em; }
+.announce-card p { margin: 6px 0 0; font-size: 0.95rem; color: var(--text); line-height: 1.4; }

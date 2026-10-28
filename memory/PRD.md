@@ -67,3 +67,4 @@ Build the browser PWA game «Мультиполия» from the spec (Техни�
 - Rent shortfall: other currency at gold price → loan/sell holdings → bankruptcy (pay all, back to Исток c0, status benefit). Status «на пособии» = no private/shared property → minimal rent.
 - Dialog queue (no orphaned dialogs), openCell try/catch + immediate reopen after rent roll; SW v7 fetch no-cache.
 - 2026-06: Results screen shows each player's bankruptcy counter (result-bankruptcies-<color>), informational only, does not affect points. Self-tested via screenshot.
+- 2026-06: Bankruptcy announcement overlay (#announce, testid bankrupt-announce, 5 s, click to dismiss, sound) driven by new h.bankrupt history entries (works online). Bot share strategy botShares(): capitalist budget 60% cash prefers biggest share; narmonist 35% cheapest; neutral 25% with 35% chance; co-owner offer acceptance capitalist always / narmonist 30% / neutral 50%. Self-tested via Playwright.

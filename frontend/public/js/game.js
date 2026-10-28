@@ -92,6 +92,8 @@
     "h.bankrupt": ["{name} — банкрот: отдано всё, возврат на «Исток», статус «На пособии»", "{name} — банкрут: віддано все, повернення на «Витік», статус «На допомозі»", "{name} is bankrupt: everything paid, back to the start, status: benefit"],
     "g.exchangeOnlyKapNar": ["Обмен валют доступен в сценарии «Капмония / Нармония»", "Обмін валют доступний у сценарії «Капмонія / Нармонія»", "Currency exchange is available in the Kapmonia / Narmonia scenario"],
     "r.bankruptcies": ["Банкротства", "Банкрутства", "Bankruptcies"], "r.noPoints": ["не влияет на очки", "не впливає на бали", "does not affect points"],
+    "g.bankruptTitle": ["Банкротство!", "Банкрутство!", "Bankruptcy!"],
+    "g.bankruptText": ["{name} отдаёт всё, возвращается на «Исток» и продолжает игру в статусе «На пособии»", "{name} віддає все, повертається на «Витік» і продовжує гру в статусі «На допомозі»", "{name} pays everything, returns to the start and continues on benefit"],
     "g.sellShare": ["Продать долю", "Продати частку", "Sell share"],
     "g.sellShareHint": ["Сначала долю предложат совладельцам. Если никто не купит — банк выкупит всё поле у всех совладельцев (100 % в нармоните), и оно станет народным.", "Спочатку частку запропонують співвласникам. Якщо ніхто не купить — банк викупить усе поле в усіх співвласників (100 % у нармоніті), і воно стане народним.", "The share is first offered to co-owners. If nobody buys, the bank buys out the whole cell from all co-owners (100 % in Narmonit) and it becomes people's property."],
     "g.shareOffer": ["Предложение: выкуп доли", "Пропозиція: викуп частки", "Offer: buy a share"],
@@ -685,7 +687,8 @@
       const opts = E.payOpts(m, price).filter((o) => q.wallet.has(o.cur, o.amount));
       if (!opts.length) continue;
       let cur = null;
-      if (q.isBot) cur = q.botType === "capitalist" || Math.random() < 0.6 ? opts[0].cur : null;
+      // capitalist always takes the share; pro-people prefers letting the bank make it people's property
+      if (q.isBot) cur = q.botType === "capitalist" || Math.random() < (q.botType === "narmonist" ? 0.3 : 0.5) ? opts[0].cur : null;
       else cur = await ask(q, {
         title: t("g.shareOffer"), sub: `${nm(id)} · ${p.name}`,
         rows: [[t("g.share"), `${Math.round(share * 100)}%`], [t("g.price"), fmt(price, unit)]],
@@ -701,6 +704,55 @@
     E.nationalize(m, id);
     m.log({ key: "h.nationalized", playerId: p.id, params: { cell: "#" + id } });
     m.changed();
+  };
+
+  /* ----- big on-screen announcements (local and online: driven by new history entries) ----- */
+  let seenHist = 0;
+  let announceTimer = null;
+  const announce = (title, text) => {
+    let el = $("#announce");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "announce";
+      el.className = "announce";
+      el.setAttribute("role", "alert");
+      el.dataset.testid = "bankrupt-announce";
+      el.addEventListener("click", () => el.classList.remove("is-on"));
+      document.body.appendChild(el);
+    }
+    el.innerHTML = `<div class="announce-card"><span class="announce-icon">!</span><div><b data-testid="bankrupt-announce-title">${esc(title)}</b><p data-testid="bankrupt-announce-text">${esc(text)}</p></div></div>`;
+    el.classList.remove("is-on");
+    void el.offsetWidth;
+    el.classList.add("is-on");
+    window.MPSound.play("bankrupt");
+    clearTimeout(announceTimer);
+    announceTimer = setTimeout(() => el.classList.remove("is-on"), 5000);
+  };
+  const announceNew = () => {
+    const list = m.history.entries;
+    if (seenHist > list.length) seenHist = list.length;
+    list.slice(seenHist).forEach((e) => {
+      if (e.key === "h.bankrupt") announce(t("g.bankruptTitle"), t("g.bankruptText", { name: (e.params && e.params.name) || "" }));
+    });
+    seenHist = list.length;
+  };
+
+  // Bots and shares: capitalist grabs big shares, pro-people (narmonist) joins with small shares, neutral is cautious
+  const botShares = async (b) => {
+    if (m.turnState.botShare) return;
+    m.turnState.botShare = true;
+    const cash = E.fiatCur(m) === "usd" ? b.wallet.get("usd") + b.wallet.get("nar") * m.bank.goldPrice : b.wallet.get(E.fiatCur(m));
+    const budget = cash * (b.botType === "capitalist" ? 0.6 : b.botType === "narmonist" ? 0.35 : 0.25);
+    if (b.botType === "neutral" && Math.random() > 0.35) return;
+    const deals = Object.keys(m.cells).flatMap((id) => E.shareOffers(m, id, b).map((o) => ({ id, o }))).filter((d) => d.o.total <= budget);
+    if (!deals.length) return;
+    deals.sort((x, y) => (b.botType === "capitalist" ? y.o.share - x.o.share || x.o.total - y.o.total : x.o.total - y.o.total));
+    const { id, o } = deals[0];
+    const pay = E.payOpts(m, o.total).find((x) => b.wallet.has(x.cur, x.amount));
+    if (!pay || !E.buyShare(m, id, b, o, pay.cur)) return;
+    m.log({ key: "h.shareBought", playerId: b.id, params: { cell: "#" + id, share: Math.round(o.share * 100) + "%" } });
+    m.changed();
+    await wait(500);
   };
 
   // Buy a share of shared property from its owners at the standard price
@@ -1057,6 +1109,7 @@
         await botAct(b, "pre");
         const conv = b.botType === "narmonist" && Object.keys(m.cells).find((id) => E.canConvert(m, id));
         if (conv && Math.random() < 0.3) await convertVote(conv);
+        await botShares(b);
         m.roll(await rollAnim());
       }
       if (m.phase === "await_move") {
@@ -1156,6 +1209,7 @@
       const same = m && m.id === match.id;
       m = match;
       if (same) return;
+      seenHist = m.history.entries.length; // announce only what happens from now on
       selected = null;
       inspect = null;
       propSel = null;
@@ -1172,6 +1226,7 @@
     },
     render() {
       if (!m) return;
+      announceNew();
       if (selected && !(m.moveOptions || []).some((o) => o.id === selected)) selected = null;
       renderBoard();
       setDice(m.turnState.utilRoll || m.lastRoll);
