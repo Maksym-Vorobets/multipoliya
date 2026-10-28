@@ -18,6 +18,7 @@
     s_free: ["Свободный сектор", "Вільний сектор", "Free sector"], s_private: ["Частная собственность", "Приватна власність", "Private property"],
     s_people: ["Народная собственность", "Народна власність", "People's property"], s_state: ["Государственный объект", "Державний об'єкт", "State object"],
     s_mortgaged: ["В залоге", "У заставі", "Mortgaged"], s_shared: ["Долевая народная собственность", "Пайова народна власність", "Shared people's property"],
+    rentMin: ["Мин. аренда", "Мін. оренда", "Min. rent"], rentTop: ["Макс. аренда", "Макс. оренда", "Max. rent"],
     utilRoll: ["Бросить кубики для расчёта аренды", "Кинути кубики для розрахунку оренди", "Roll the dice to set the rent"],
     rentMax: ["Аренда", "Оренда", "Rent"], sharedVote: ["голосование долевиков", "голосування пайовиків", "co-owners vote"],
     selfRentTax: ["Аренда самому себе (налог {p}%)", "Оренда самому собі (податок {p}%)", "Rent to yourself (tax {p}%)"],
@@ -71,18 +72,60 @@
     const c = B.cells[id];
     const s = st(m, id);
     if (c.kind === "station" || c.kind === "utility") {
-      const count = Math.max(1, B.setCells(c.kind, c.ring).filter((k) => sameHolding(m, id, k)).length);
-      if (c.kind === "station") return m.bank.fiat(c.rent[Math.min(3, count - 1)]);
-      // Utilities: the tenant rolls the dice once more; until then show the middle bracket
-      const ur = m.turnState && m.turnState.utilRoll;
-      const sum = ur && ur.id === id ? ur.sum : 7;
-      return m.bank.fiat((count >= 2 ? c.rent.both : c.rent.one)[sum <= 4 ? 0 : sum <= 8 ? 1 : 2]);
+      const r = setRent(m, id);
+      return r.choices.length ? r.choices[r.choices.length - 1] : r.min;
     }
     const t = B.rentTable(c);
     const L_ = lvl ?? level(s);
     let base = L_ === 5 ? t.dome : t.modules[L_];
     if (L_ === 0 && groupComplete(m, id)) base = t.double;
     return m.bank.fiat(base);
+  };
+  /* ----- stations (4 per ring) and utilities (Kvantal + Icite per ring) ----- */
+  const UTIL_RENT = { 1: [36, 60, 96, 120], 2: [72, 120, 180, 240] }; // dice 2–3 / 4–6 / 7–9 / 10–12
+  const STATION_RENT = [36, 60, 120, 240]; // 1 / 2 / 3 / 4 stations in the group
+  const diceBracket = (sum) => (sum <= 3 ? 0 : sum <= 6 ? 1 : sum <= 9 ? 2 : 3);
+  // Shared holdings stack only if their owners overlap by at least 50 %
+  const overlap = (x, y) => Object.keys(x.owners).reduce((acc, k) => acc + Math.min(x.owners[k], y.owners[k] || 0), 0);
+  const sameSetHolding = (m, a, b) => {
+    if (a === b) return true;
+    const x = st(m, a);
+    const y = st(m, b);
+    const mdl = model(m, a);
+    if (mdl !== model(m, b)) return false;
+    if (mdl === "gos") return !!x.built && !!y.built;
+    if (!Object.keys(x.owners).length || !Object.keys(y.owners).length || x.type !== y.type) return false;
+    if (mdl === "kap") return !!soleOwner(x) && soleOwner(x) === soleOwner(y);
+    return x.type === "people" || overlap(x, y) >= 0.5 - 1e-6; // people's stacks only with people's
+  };
+  const setGroup = (m, id) => {
+    const c = B.cells[id];
+    const all = B.setCells(c.kind, c.ring);
+    return { n: all.filter((k) => sameSetHolding(m, id, k)).length, of: all.length };
+  };
+  // Rent for a station / utility: { min, max, choices (fiat), needRoll, group }
+  const setRent = (m, id, p) => {
+    const c = B.cells[id];
+    const mdl = model(m, id);
+    const group = setGroup(m, id);
+    const f = (x) => m.bank.fiat(x);
+    const ur = m.turnState && m.turnState.utilRoll;
+    const sum = ur && ur.id === id ? ur.sum : null;
+    const table = c.kind === "utility" ? UTIL_RENT[group.n >= 2 ? 2 : 1] : STATION_RENT.slice(0, group.n);
+    const util = c.kind === "utility";
+    let choices;
+    let roll = false;
+    if (m.scenario === "gos_gos" || (p && p.status === "benefit" && mdl !== "nar")) choices = [table[0]];
+    else if (mdl === "nar") {
+      roll = util;
+      choices = !util ? table : sum ? table.slice(0, diceBracket(sum) + 1) : [];
+    } else {
+      roll = util;
+      choices = !util ? [table[table.length - 1]] : sum ? [table[diceBracket(sum)]] : [];
+    }
+    const min = mdl === "gos" ? choices[0] || table[0] : table[0];
+    const max = mdl === "gos" ? choices[choices.length - 1] || min : util ? table[3] : STATION_RENT[3];
+    return { group, min: f(min), max: f(max), choices: choices.map(f), needRoll: roll && !sum };
   };
   // Same holding = same form of ownership AND the same owner(s); people's ≠ shared even with identical players
   const sameHolding = (m, a, b) => {
@@ -120,7 +163,7 @@
     const s = st(m, id);
     const t = B.rentTable(B.cells[id]);
     const f = (x) => m.bank.fiat(x);
-    if (["station", "utility"].includes(B.cells[id].kind)) return [{ key: "rentTariff", fiat: rentFor(m, id) }];
+    if (["station", "utility"].includes(B.cells[id].kind)) return setRent(m, id).choices.map((fiat) => ({ key: "rentTariff", fiat }));
     const list = [{ key: "rentTariff", fiat: f(t.base) }];
     if (sameKindGroup(m, id)) list.push({ key: "rentDoubleT", fiat: f(t.double) });
     for (let n = 1; n <= s.modules; n++) list.push({ key: "rentMods", n, fiat: f(t.modules[n]) });
@@ -180,7 +223,15 @@
     const add = (a) => list.push({ ...a, opts: a.opts || [] });
     const owner = soleOwner(s);
     const due = stage === "post" && t.due && t.due.id === id;
-    if (due && c.kind === "utility" && !(t.utilRoll && t.utilRoll.id === id)) return [{ id: "utilRoll", label: L("utilRoll"), opts: [], mandatory: true }];
+    // Stations / utilities: (dice roll for utilities) → straight to the rent payment
+    if (due && (c.kind === "station" || c.kind === "utility")) {
+      const r = setRent(m, id, p);
+      if (r.needRoll) return [{ id: "utilRoll", label: L("utilRoll"), opts: [], mandatory: true }];
+      const rid = mdl === "kap" ? "payRent" : mdl === "nar" ? "narRent" : "bankRent";
+      r.choices.forEach((fiat, i) => add({ id: rid, rent: true, tariff: i, key: "rentSet", n: i, fiat, label: L(r.choices.length === 1 ? "rentMax" : i === 0 ? "rentMin" : i === r.choices.length - 1 ? "rentTop" : "rentMax"), opts: payOpts(m, fiat), mandatory: true }));
+      if (mdl === "gos" && !s.built) add({ id: "gosBuild", label: L("gosBuild"), opts: [{ cur: fiatCur(m), amount: 0 }] });
+      return list;
+    }
 
     if (mdl === "kap") {
       if (s.type === "free") {
@@ -260,6 +311,12 @@
         owner.wallet.add(opt.cur, opt.amount);
         owner.rentIncome = r2((owner.rentIncome || 0) + (opt.cur === "nar" ? opt.amount * m.bank.goldPrice : opt.amount));
         m.log({ key: "h.rent", playerId: p.id, params: { cell: name, to: owner.name }, money: [{ cur: opt.cur, amount: -opt.amount }] });
+        p.stats.life += fiatOf(m, opt);
+        done(true);
+        return { ok: true };
+      }
+      case "bankRent": {
+        if (!pay(m, p, opt, "h.bankRent", { cell: name })) return { ok: false };
         p.stats.life += fiatOf(m, opt);
         done(true);
         return { ok: true };
@@ -685,6 +742,6 @@
   window.MPEco = {
     L, model, zone, fiatCur, SP, fiatOf, payOpts, canPayAny, st, price, buildCost, rentFor, tariffs, level, soleOwner, propValue, kapPropertyValue,
     ownedCells, actions, perform, auctionWin, jointBuy, publicBuild, sharedBuild, sharedPlan, canConvert, convertRefunds, convertShared, shareOffers, buyShare, markDone, didAct, mortgage, sellPrice, sellToBank, loanLimit, takeLoan, repayLoans,
-    onLand, onRound, everyTurnStart, statusLabel, refreshBenefit, holdings, holdingValue, sellHolding, shortfall, cover, allIn,
+    onLand, onRound, everyTurnStart, statusLabel, refreshBenefit, holdings, holdingValue, sellHolding, setRent, shortfall, cover, allIn,
   };
 })();

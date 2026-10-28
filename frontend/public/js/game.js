@@ -79,6 +79,8 @@
     "g.otherActs": ["Другие действия", "Інші дії", "Other actions"], "g.weight": ["Доля голоса", "Частка голосу", "Vote weight"],
     "g.coOwners": ["Средства долевиков", "Кошти пайовиків", "Co-owners' funds"], "g.yourPart": ["Ваша часть", "Ваша частина", "Your part"],
     "g.convert": ["Голосование: перевести в народную", "Голосування: перевести в народну", "Vote: convert to people's property"],
+    "g.rentMinRow": ["Мин. аренда", "Мін. оренда", "Min. rent"], "g.rentMaxRow": ["Макс. аренда", "Макс. оренда", "Max. rent"], "g.groupRow": ["Группа", "Група", "Group"],
+    "h.bankRent": ["Аренда {cell} в банк:", "Оренда {cell} у банк:", "Rent {cell} to the bank:"],
     "g.rentDice1": ["Аренда (2–4 / 5–8 / 9–12), 1 поле", "Оренда (2–4 / 5–8 / 9–12), 1 поле", "Rent (2–4 / 5–8 / 9–12), 1 field"],
     "g.rentDice2": ["Аренда при Квантале и Айсайте", "Оренда при Квантал і Айсайт", "Rent with Kvantal and Icite"],
     "g.rentStations": ["Аренда за 1 / 2 / 3 / 4 станции", "Оренда за 1 / 2 / 3 / 4 станції", "Rent for 1 / 2 / 3 / 4 stations"],
@@ -383,10 +385,12 @@
     const cur = m.scenario === "nar_nar" ? "usd" : fc;
     const rows = [[t("g.price"), fmt(E.price(m, id), cur)]];
     if (c.build) rows.push([t("g.module"), fmt(E.buildCost(m, id), cur)], [t("g.dome"), fmt(E.buildCost(m, id, "dome"), cur)]);
-    if (c.kind === "utility") {
-      const r = c.rent;
-      rows.push([t("g.rentDice1"), r.one.map((x) => fmt(m.bank.fiat(x), cur)).join(" / ")], [t("g.rentDice2"), r.both.map((x) => fmt(m.bank.fiat(x), cur)).join(" / ")]);
-    } else if (c.kind === "station") rows.push([t("g.rentStations"), c.rent.map((x) => fmt(m.bank.fiat(x), cur)).join(" / ")]);
+    if (c.kind === "utility" || c.kind === "station") {
+      // 4-row card: price, min rent, max rent, group
+      const r = E.setRent(m, id);
+      rows.push([t("g.rentMinRow"), fmt(r.min, cur)], [t("g.rentMaxRow"), fmt(r.max, cur)], [t("g.groupRow"), `${r.group.n}/${r.group.of}`]);
+      return rows;
+    }
     if (Object.keys(s.owners).length || mdl === "gos") rows.push([t("g.rent"), fmt(E.rentFor(m, id), cur)]);
     if (c.build) rows.push([t("g.buildings"), `${s.dome ? 5 : s.modules} / 5`]);
     return rows;
@@ -960,7 +964,7 @@
     const affordable = (a) => a.opts.find((o) => b.wallet.has(o.cur, o.amount) && (a.mandatory || b.wallet.get(o.cur) - o.amount >= reserve(b) * (o.cur === "nar" ? 1 : startSum)));
     const mand = acts.filter((a) => a.mandatory);
     if (mand.length) {
-      const prefs = b.botType === "narmonist" ? ["utilRoll", "publicModule", "sharedBuild", "module", "gosBuild", "rentDouble", "narRent", "payRent", "tender", "rentOrd"] : ["utilRoll", "tender", "module", "gosBuild", "rentOrd", "narRent", "payRent", "rentDouble", "publicModule", "sharedBuild"];
+      const prefs = b.botType === "narmonist" ? ["utilRoll", "bankRent", "publicModule", "sharedBuild", "module", "gosBuild", "rentDouble", "narRent", "payRent", "tender", "rentOrd"] : ["utilRoll", "bankRent", "tender", "module", "gosBuild", "rentOrd", "narRent", "payRent", "rentDouble", "publicModule", "sharedBuild"];
       for (const id of prefs) {
         const a = mand.find((x) => x.id === id && (!x.opts.length || x.opts[0].amount === 0 || affordable(x) || x.tariff === 0 || x.id === "payRent"));
         if (a) return { a, o: a.opts.find((o) => b.wallet.has(o.cur, o.amount)) || a.opts[0] };
