@@ -343,6 +343,6 @@
   }
   const renderSoundBtn = () => $("#btn-sound").classList.toggle("is-off", !window.MPSound.on);
   renderSoundBtn();
-  window.MPApp = { toast, renderGame, go, applyRemote, startOnline, esc, renderSoundBtn, renderResume };
+  window.MPApp = { toast, histText, renderGame, go, applyRemote, startOnline, esc, renderSoundBtn, renderResume };
   window.MP = { ui, go }; // debug hook
 })();

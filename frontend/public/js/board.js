@@ -71,7 +71,7 @@
         kind = key;
       } else if (STATIONS.includes(token)) kind = "station";
       else if (token === "kvantal" || token === "icite") kind = "utility";
-      const c = { id, pos, ring, kind, key, label: token.replace("_", " ").toUpperCase() };
+      const c = { id, pos, ring, kind, key, token };
       if (kind === "planet" || kind === "station" || kind === "utility") {
         const row = PRICE[`${key}-1${ring}`];
         Object.assign(c, { price: row.price, build: row.module, dome: row.dome, rent: row.rent });
@@ -131,6 +131,8 @@
     const n = NAMES[c.key] ? NAMES[c.key][LANG_IDX[lang] ?? 0] : c.key;
     return c.ring ? `${n} 1${c.ring}` : n;
   };
+  // Side label above a slot (both rings), e.g. "ЛУНА", "CHANCE BORGI", "ОРИОН"
+  const label = (id, lang) => cells[id].token.split("_").map((k) => NAMES[k][LANG_IDX[lang] ?? 0].replace(/^Ст\. | St\.$/g, "")).join(" ").toUpperCase();
   const art = (id) => {
     const c = cells[id];
     if (c.kind === "corner") return { img: CORNER_IMG[c.id], hue: 0 };
@@ -139,5 +141,5 @@
   };
   const rentTable = (c) => ({ base: c.rent[0], double: c.rent[0] * 2, modules: c.rent.slice(0, 5), dome: c.rent[5] });
 
-  window.MPBoard = { cells, groupOf, order, GROUPS, CORNERS, next, reachable, forwardTo, groupCells, setCells, name, art, rentTable, STATIONS };
+  window.MPBoard = { cells, groupOf, order, GROUPS, CORNERS, next, reachable, forwardTo, groupCells, setCells, name, label, art, rentTable, STATIONS };
 })();

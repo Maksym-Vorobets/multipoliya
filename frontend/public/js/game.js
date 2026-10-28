@@ -119,6 +119,27 @@
     "h.converted": ["{cell} переведена в народную собственность", "{cell} переведено в народну власність", "{cell} converted to people's property"],
     "snd.turnOff": ["Выключить звук", "Вимкнути звук", "Turn sound off"], "snd.turnOn": ["Включить звук", "Увімкнути звук", "Turn sound on"],
     "snd.on": ["Звук включён", "Звук увімкнено", "Sound on"], "snd.off": ["Звук выключен", "Звук вимкнено", "Sound off"],
+    "h.bw.buy": ["{type}: покупает долю {share} в {cell} — {why}", "{type}: купує частку {share} у {cell} — {why}", "{type}: buys a {share} share of {cell} — {why}"],
+    "h.bw.voteYes": ["{type}: голосует «за» ({cell}) — {why}", "{type}: голосує «за» ({cell}) — {why}", "{type}: votes for ({cell}) — {why}"],
+    "h.bw.voteNo": ["{type}: голосует «против» ({cell}) — {why}", "{type}: голосує «проти» ({cell}) — {why}", "{type}: votes against ({cell}) — {why}"],
+    "h.bw.take": ["{type}: выкупает предложенную долю в {cell} — {why}", "{type}: викуповує запропоновану частку в {cell} — {why}", "{type}: takes the offered share of {cell} — {why}"],
+    "h.bw.skip": ["{type}: отказывается от доли в {cell} — {why}", "{type}: відмовляється від частки в {cell} — {why}", "{type}: declines the share of {cell} — {why}"],
+    "h.bw.join": ["{type}: участвует в совместной покупке {cell} — {why}", "{type}: бере участь у спільній купівлі {cell} — {why}", "{type}: joins the joint purchase of {cell} — {why}"],
+    "h.bw.noJoin": ["{type}: не участвует в совместной покупке {cell} — {why}", "{type}: не бере участі у спільній купівлі {cell} — {why}", "{type}: stays out of the joint purchase of {cell} — {why}"],
+    "bw.capBig": ["крупная доля даёт больше прибыли и влияния", "велика частка дає більше прибутку і впливу", "a big share means more profit and influence"],
+    "bw.narCheap": ["самая доступная доля: участвует в общем деле понемногу", "найдоступніша частка: долучається до спільної справи потроху", "the most affordable share: joins the common cause bit by bit"],
+    "bw.neuCareful": ["осторожная покупка в пределах бюджета", "обережна купівля в межах бюджету", "a careful purchase within budget"],
+    "bw.capOwn": ["увеличивает свою частную собственность", "збільшує свою приватну власність", "grows private property"],
+    "bw.capNoShared": ["не поддерживает общие траты и народную собственность", "не підтримує спільні витрати та народну власність", "does not back shared spending or people's property"],
+    "bw.capProfit": ["решил, что выгода выше затрат", "вирішив, що вигода більша за витрати", "decided the gain outweighs the cost"],
+    "bw.narPeople": ["поддерживает общее строительство и народную собственность", "підтримує спільне будівництво та народну власність", "backs common construction and people's property"],
+    "bw.narLetBank": ["пусть банк выкупит поле и оно станет народным", "нехай банк викупить поле і воно стане народним", "lets the bank buy the cell so it becomes people's property"],
+    "bw.narKeep": ["сохраняет долю за игроками", "зберігає частку за гравцями", "keeps the share among players"],
+    "bw.neuYes": ["взвесил и решил, что это выгодно", "зважив і вирішив, що це вигідно", "weighed it up and found it worthwhile"],
+    "bw.neuNo": ["взвесил и решил не рисковать", "зважив і вирішив не ризикувати", "weighed it up and chose not to risk it"],
+    "bw.noFunds": ["не хватает средств на свою часть", "бракує коштів на свою частину", "not enough money for its part"],
+    "bw.capSolo": ["предпочитает владеть единолично", "воліє володіти одноосібно", "prefers sole ownership"],
+    "bw.joinCommon": ["поддерживает совместную собственность", "підтримує спільну власність", "supports joint ownership"],
   });
 
   let m = null;
@@ -215,8 +236,15 @@
   };
   const renderBoard = () => {
     const board = $("#board");
-    if (board.dataset.built === "1") return updateBoard();
+    if (board.dataset.built === "1") {
+      if (board.dataset.lang !== lang()) {
+        board.dataset.lang = lang();
+        $$("[data-label]", board).forEach((el) => (el.textContent = el.classList.contains("slot-label") ? B.label(el.dataset.label, lang()) : nm(el.dataset.label).toUpperCase()));
+      }
+      return updateBoard();
+    }
     board.dataset.built = "1";
+    board.dataset.lang = lang();
     $$(".board-corner, .board-soon", board).forEach((e) => e.remove());
     let html = "";
     B.order.forEach((ids, pos) => {
@@ -224,14 +252,14 @@
         const id = ids[0];
         const pl = { 0: [11, 11], 10: [11, 1], 20: [1, 1], 30: [1, 11] }[pos];
         html += `<button class="corner cell" data-cell="${id}" style="grid-row:${pl[0]};grid-column:${pl[1]}" data-testid="cell-${id}">
-          <img src="/assets/img/${B.art(id).img}.png" alt="" /><span>${nm(id).toUpperCase()}</span><span class="cell-marks"></span></button>`;
+          <img src="/assets/img/${B.art(id).img}.png" alt="" /><span data-label="${id}">${nm(id).toUpperCase()}</span><span class="cell-marks"></span></button>`;
         return;
       }
       const { row, col, dir } = slotPlace(pos);
       const c1 = B.cells[ids[0]];
       const gcol = c1.group != null ? B.GROUPS[c1.group][2] : "var(--surface-3)";
       html += `<div class="slot slot--${dir}" style="grid-row:${row};grid-column:${col}">
-        <span class="slot-label${c1.group == null ? " slot-label--neutral" : ""}" style="--g:${gcol}">${c1.label}</span>
+        <span class="slot-label${c1.group == null ? " slot-label--neutral" : ""}" style="--g:${gcol}" data-label="${ids[0]}" data-testid="slot-label-${pos}">${B.label(ids[0], lang())}</span>
         <button class="cell" data-cell="${ids[0]}" data-testid="cell-${ids[0]}">${cellInner(ids[0])}</button>
         <button class="cell" data-cell="${ids[1]}" data-testid="cell-${ids[1]}">${cellInner(ids[1])}</button></div>`;
     });
@@ -654,6 +682,18 @@
       botYes: (p) => { const x = plan.find((y) => y.pl === p); return !!(x && x.opt) && p.botType !== "capitalist"; },
     };
   };
+  // Bot decision explanations: history entry + short on-screen tip (works online via history)
+  const botWhy = (p, key, why, id, params = {}) => m.log({ key: "h.bw." + key, playerId: p.id, params: { type: "@bot." + p.botType, why: "@bw." + why, cell: "#" + id, ...params } });
+  const botVote = (p, subj) => {
+    if (subj.botYes) {
+      const v = subj.botYes(p);
+      return [v, p.botType === "capitalist" ? "capNoShared" : !v ? "noFunds" : p.botType === "narmonist" ? "narPeople" : "neuYes"];
+    }
+    if (p.botType === "narmonist") return [true, "narPeople"];
+    const v = Math.random() < (p.botType === "capitalist" ? 0.2 : 0.6);
+    if (p.botType === "capitalist") return [v, v ? "capProfit" : "capNoShared"];
+    return [v, v ? "neuYes" : "neuNo"];
+  };
   const vote = async (id, initiator, subj) => {
     const s = E.st(m, id);
     const active = m.players.filter((p) => p.status !== "bankrupt");
@@ -665,8 +705,11 @@
     for (const { p, w } of voters) {
       let v;
       if (p === initiator) v = true;
-      else if (p.isBot) v = subj.botYes ? subj.botYes(p) : p.botType === "narmonist" ? true : p.botType === "capitalist" ? Math.random() < 0.2 : Math.random() < 0.6;
-      else v = await ask(p, { title: `${t("g.vote")} · ${subj.title}`, sub: `${nm(id)} · ${t("g.voter")}: ${p.name}`, rows: [[t("g.initiator"), esc(initiator.name)], ...subj.rows(p), [t("g.weight"), `${Math.round((w / total) * 100)}%`]], buttons: [{ label: t("g.yes"), value: true, primary: true, testid: "vote-yes-btn" }, { label: t("g.no"), value: false, testid: "vote-no-btn" }], closable: false });
+      else if (p.isBot) {
+        const [bv, why] = botVote(p, subj);
+        v = bv;
+        botWhy(p, v ? "voteYes" : "voteNo", why, id);
+      } else v = await ask(p, { title: `${t("g.vote")} · ${subj.title}`, sub: `${nm(id)} · ${t("g.voter")}: ${p.name}`, rows: [[t("g.initiator"), esc(initiator.name)], ...subj.rows(p), [t("g.weight"), `${Math.round((w / total) * 100)}%`]], buttons: [{ label: t("g.yes"), value: true, primary: true, testid: "vote-yes-btn" }, { label: t("g.no"), value: false, testid: "vote-no-btn" }], closable: false });
       if (v) yes += w;
     }
     const ok = yes / total >= 0.5 - 1e-9; // 50 % «за» — решение принято
@@ -688,8 +731,11 @@
       if (!opts.length) continue;
       let cur = null;
       // capitalist always takes the share; pro-people prefers letting the bank make it people's property
-      if (q.isBot) cur = q.botType === "capitalist" || Math.random() < (q.botType === "narmonist" ? 0.3 : 0.5) ? opts[0].cur : null;
-      else cur = await ask(q, {
+      if (q.isBot) {
+        cur = q.botType === "capitalist" || Math.random() < (q.botType === "narmonist" ? 0.3 : 0.5) ? opts[0].cur : null;
+        const why = { capitalist: "capOwn", narmonist: cur ? "narKeep" : "narLetBank" }[q.botType] || (cur ? "neuYes" : "neuNo");
+        botWhy(q, cur ? "take" : "skip", why, id);
+      } else cur = await ask(q, {
         title: t("g.shareOffer"), sub: `${nm(id)} · ${p.name}`,
         rows: [[t("g.share"), `${Math.round(share * 100)}%`], [t("g.price"), fmt(price, unit)]],
         buttons: [...opts.map((o) => ({ label: `${t("g.buyShare")} · ${fmt(o.amount, o.cur)}`, value: o.cur, primary: true, testid: `share-offer-buy-${o.cur}-btn` })), { label: t("g.no"), value: null, testid: "share-offer-decline-btn" }],
@@ -733,8 +779,23 @@
     if (seenHist > list.length) seenHist = list.length;
     list.slice(seenHist).forEach((e) => {
       if (e.key === "h.bankrupt") announce(t("g.bankruptTitle"), t("g.bankruptText", { name: (e.params && e.params.name) || "" }));
+      if (e.key.startsWith("h.bw.")) botTip(e);
     });
     seenHist = list.length;
+  };
+  const botTip = (e) => {
+    const p = m.player(e.playerId);
+    const box = $("#toasts");
+    if (!p || !box) return;
+    while (box.querySelectorAll(".bot-tip").length >= 3) box.querySelector(".bot-tip").remove();
+    const el = document.createElement("div");
+    el.className = "bot-tip";
+    el.style.setProperty("--bc", COLOR_HEX[p.color] || "var(--gold)");
+    el.dataset.testid = "bot-tip";
+    el.innerHTML = `<b data-testid="bot-tip-name">${esc(p.name)}</b><span data-testid="bot-tip-text">${esc(window.MPApp.histText(e))}</span>`;
+    box.appendChild(el);
+    setTimeout(() => el.classList.add("is-out"), 3600);
+    setTimeout(() => el.remove(), 3900);
   };
 
   // Bots and shares: capitalist grabs big shares, pro-people (narmonist) joins with small shares, neutral is cautious
@@ -751,6 +812,7 @@
     const pay = E.payOpts(m, o.total).find((x) => b.wallet.has(x.cur, x.amount));
     if (!pay || !E.buyShare(m, id, b, o, pay.cur)) return;
     m.log({ key: "h.shareBought", playerId: b.id, params: { cell: "#" + id, share: Math.round(o.share * 100) + "%" } });
+    botWhy(b, "buy", { capitalist: "capBig", narmonist: "narCheap" }[b.botType] || "neuCareful", id, { share: Math.round(o.share * 100) + "%" });
     m.changed();
     await wait(500);
   };
@@ -814,8 +876,10 @@
     for (const p of chosen) {
       const can = E.canPayAny(p, E.payOpts(m, part));
       let ok;
-      if (p.isBot) ok = can && p.botType !== "capitalist";
-      else ok = can && (await ask(p, { title: t("g.joint"), sub: `${nm(id)} · ${p.name}`, rows: [[t("g.part"), fmt(part, m.scenario === "nar_nar" ? "usd" : E.fiatCur(m))]], buttons: [{ label: t("g.join"), value: true, primary: true }, { label: t("g.pass"), value: false }], closable: false }));
+      if (p.isBot) {
+        ok = can && p.botType !== "capitalist";
+        botWhy(p, ok ? "join" : "noJoin", !can ? "noFunds" : ok ? "joinCommon" : "capSolo", id);
+      } else ok = can && (await ask(p, { title: t("g.joint"), sub: `${nm(id)} · ${p.name}`, rows: [[t("g.part"), fmt(part, m.scenario === "nar_nar" ? "usd" : E.fiatCur(m))]], buttons: [{ label: t("g.join"), value: true, primary: true }, { label: t("g.pass"), value: false }], closable: false }));
       if (ok) partners.push(p);
     }
     E.jointBuy(m, id, partners);
