@@ -55,3 +55,14 @@ Build the browser PWA game «Мультиполия» from the spec (Техни�
 - P1: retest iteration_6 fixes; split game.js (>1000 lines)
 - P1: smarter bot personalities; full localization audit
 - P2: real ad SDK (currently MOCKED), leaderboards
+
+## 2026-06 — Session update 2 (NOT YET VERIFIED BY TESTING AGENT — user reviewing preview first)
+- Backend requirements.txt: only open-source packages (fastapi, starlette, uvicorn, websockets, motor, pymongo, pydantic, python-dotenv, bcrypt, PyJWT); dev deps in requirements-dev.txt.
+- Turn counter shows roundNo (a turn = everyone rolled once; doubles stay in the round). Votes: >=50% = accepted. Conversion vote: all players equal, refund = actually spent (nar as-is, $ at current gold price).
+- Share buyout (shareOffers/buyShare): equal-split sets 100/50/33/25, buyer <= others, standard price, paid to givers.
+- Share SALE (sellShareFlow): offer to co-owners at nominal value → else bank nationalizes whole cell (100% nominal in Narmonit to all co-owners) → people's property.
+- Fullscreen (fullscreen.js): header icon desktop/tablet, in modal menu on mobile; auto-enter on first gesture; manifest display fullscreen.
+- Mobile: burger opens single modal menu (game menu / site menu) incl. exchange, fullscreen, sound; header sound/fs icons hidden; «Текущий сектор» panel under board; no page scroll; start screen per design, «Правила» hidden when resume buttons visible.
+- Utilities (Kvantal/Icite, 204$) and stations: setRent()/setGroup(); group stacking: people≠shared, shared stack if owner overlap >=50%; utility dice tariffs 36/60/96/120 | 72/120/180/240; stations 36/60/120/240; nar = choose min..max; kap benefit = min w/o roll; gos → bank (bankRent), gos_gos = min in ₽. 4-row card.
+- Rent shortfall: other currency at gold price → loan/sell holdings → bankruptcy (pay all, back to Исток c0, status benefit). Status «на пособии» = no private/shared property → minimal rent.
+- Dialog queue (no orphaned dialogs), openCell try/catch + immediate reopen after rent roll; SW v7 fetch no-cache.

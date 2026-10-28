@@ -1,4 +1,4 @@
-const CACHE = "multipolia-v6";
+const CACHE = "multipolia-v7";
 const ASSETS = [
   "/",
   "/index.html",
@@ -47,7 +47,7 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(req.url);
   if (req.method !== "GET" || url.origin !== location.origin || SKIP.some((s) => url.pathname.includes(s))) return;
   e.respondWith(
-    fetch(req)
+    fetch(req, { cache: "no-cache" }) // revalidate: an installed app never runs a stale mix of scripts
       .then((res) => {
         if (res.ok) {
           const copy = res.clone();

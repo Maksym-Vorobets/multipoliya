@@ -589,7 +589,29 @@
     refreshBenefit(m, p);
   };
   /* ----- paying rent without enough money ----- */
-  const holdingValue = (m, id, p) => (model(m, id) === "kap" ? sellPrice(m, id) : Math.round((shareValue(m, id) * (st(m, id).owners[p.id] || 0) * SP.sellToBankPercent) / 100));
+  const holdingValue = (m, id, p) => (model(m, id) === "kap" ? sellPrice(m, id) : Math.round(shareValue(m, id) * (st(m, id).owners[p.id] || 0)));
+  // Narmonia «full buy-out»: the bank takes the WHOLE cell (land + modules + dome) from ALL co-owners,
+  // pays each 100 % of the nominal value of their share in Narmonit, and the cell becomes people's property
+  const nationalize = (m, id) => {
+    const s = st(m, id);
+    const value = shareValue(m, id);
+    const payouts = Object.entries(s.owners).map(([pid, share]) => ({ pl: m.player(pid), nar: m.bank.usdToNar(value * share) }));
+    payouts.forEach((x) => x.pl && m.credit(x.pl, "nar", x.nar, "h.nationalize", { cell: "#" + id }));
+    const active = m.players.filter((pl) => pl.status !== "bankrupt");
+    Object.assign(s, { type: "people", owners: Object.fromEntries(active.map((pl) => [pl.id, 1 / active.length])), mortgaged: false, spent: {} });
+    return payouts;
+  };
+  // A co-owner buys the seller's whole share at the nominal value
+  const transferShare = (m, id, seller, buyer, opt) => {
+    const s = st(m, id);
+    const share = s.owners[seller.id] || 0;
+    m.transfer(buyer, seller, opt.cur, opt.amount, "h.shareSold", { cell: "#" + id, share: Math.round(share * 100) + "%" });
+    s.owners[buyer.id] = (s.owners[buyer.id] || 0) + share;
+    delete s.owners[seller.id];
+    s.spent = s.spent || {};
+    delete s.spent[seller.id];
+    addSpent(s, buyer, opt);
+  };
   const sellHolding = (m, p, id) => {
     if (model(m, id) === "kap") return sellToBank(m, p, id);
     const s = st(m, id);
@@ -742,6 +764,6 @@
   window.MPEco = {
     L, model, zone, fiatCur, SP, fiatOf, payOpts, canPayAny, st, price, buildCost, rentFor, tariffs, level, soleOwner, propValue, kapPropertyValue,
     ownedCells, actions, perform, auctionWin, jointBuy, publicBuild, sharedBuild, sharedPlan, canConvert, convertRefunds, convertShared, shareOffers, buyShare, markDone, didAct, mortgage, sellPrice, sellToBank, loanLimit, takeLoan, repayLoans,
-    onLand, onRound, everyTurnStart, statusLabel, refreshBenefit, holdings, holdingValue, sellHolding, setRent, shortfall, cover, allIn,
+    onLand, onRound, everyTurnStart, statusLabel, refreshBenefit, holdings, holdingValue, sellHolding, setRent, nationalize, transferShare, shortfall, cover, allIn,
   };
 })();

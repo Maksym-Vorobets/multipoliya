@@ -91,6 +91,12 @@
     "h.sellShare": ["Доля {cell} продана банку:", "Частку {cell} продано банку:", "Share of {cell} sold to the bank:"],
     "h.bankrupt": ["{name} — банкрот: отдано всё, возврат на «Исток», статус «На пособии»", "{name} — банкрут: віддано все, повернення на «Витік», статус «На допомозі»", "{name} is bankrupt: everything paid, back to the start, status: benefit"],
     "g.exchangeOnlyKapNar": ["Обмен валют доступен в сценарии «Капмония / Нармония»", "Обмін валют доступний у сценарії «Капмонія / Нармонія»", "Currency exchange is available in the Kapmonia / Narmonia scenario"],
+    "g.sellShare": ["Продать долю", "Продати частку", "Sell share"],
+    "g.sellShareHint": ["Сначала долю предложат совладельцам. Если никто не купит — банк выкупит всё поле у всех совладельцев (100 % в нармоните), и оно станет народным.", "Спочатку частку запропонують співвласникам. Якщо ніхто не купить — банк викупить усе поле в усіх співвласників (100 % у нармоніті), і воно стане народним.", "The share is first offered to co-owners. If nobody buys, the bank buys out the whole cell from all co-owners (100 % in Narmonit) and it becomes people's property."],
+    "g.shareOffer": ["Предложение: выкуп доли", "Пропозиція: викуп частки", "Offer: buy a share"],
+    "h.shareToCoOwner": ["Доля {share} в {cell} выкуплена у {from}", "Частку {share} у {cell} викуплено в {from}", "Bought {share} of {cell} from {from}"],
+    "h.nationalize": ["Выкуп банком {cell} (100 % вложений):", "Викуп банком {cell} (100 % вкладень):", "Bank buy-out {cell} (100 % of investment):"],
+    "h.nationalized": ["{cell}: совладельцы отказались — банк выкупил всё поле, теперь это народная собственность", "{cell}: співвласники відмовилися — банк викупив усе поле, тепер це народна власність", "{cell}: co-owners declined — the bank bought the whole cell, it is now people's property"],
     "g.buyShare": ["Выкупить долю", "Викупити частку", "Buy a share"],
     "h.shareBought": ["Выкуплена доля {share} в {cell}", "Викуплено частку {share} у {cell}", "Bought a {share} share of {cell}"],
     "h.shareSold": ["Продажа доли {share} в {cell} → {to}:", "Продаж частки {share} у {cell} → {to}:", "Share {share} of {cell} sold → {to}:"],
@@ -427,6 +433,7 @@
     }).join("");
     const s = propSel && m.cells[propSel];
     const kapOwn = !!s && E.soleOwner(s) === p.id && E.model(m, propSel) === "kap";
+    const narShared = !!s && E.model(m, propSel) === "nar" && s.type === "shared" && s.owners[p.id] > 0;
     const can = kapOwn && myTurn(p);
     const c = propSel && B.cells[propSel];
     const dis = (ok) => (ok ? "" : "disabled");
@@ -439,7 +446,7 @@
       ${ids.length ? `<div class="prop-bar" data-testid="prop-action-bar">
         <div class="prop-bar-name" data-testid="prop-selected-name">${propSel ? `${t("g.selected")}: <b>${esc(nm(propSel))}</b>` : t("g.selectProp")}</div>
         <button class="btn btn--sm" data-prop="mortgage" ${dis(can)} data-testid="prop-mortgage-btn">${s && s.mortgaged ? t("g.redeem") : t("g.mortgageBtn")}</button>
-        <button class="btn btn--sm" data-prop="sell" ${dis(can)} data-testid="prop-sell-btn">${t("g.sellBank")}</button>
+        <button class="btn btn--sm" data-prop="sell" ${dis(can || (narShared && myTurn(p)))} data-testid="prop-sell-btn">${narShared ? t("g.sellShare") : t("g.sellBank")}</button>
         <button class="btn btn--sm${s && s.tender ? " is-on" : ""}" data-prop="tender" ${dis(can && c.build && !s.dome)} data-testid="prop-tender-btn">${t("g.tender")}: ${s && s.tender ? t("g.on") : t("g.off")}</button>
         <button class="btn btn--sm${s && s.collect ? " is-on" : ""}" data-prop="collect" ${dis(can)} data-testid="prop-collect-btn">${t("g.collect")}: ${s && s.collect ? t("g.on") : t("g.off")}</button>
       </div>` : ""}`;
@@ -558,6 +565,7 @@
         });
       }
       if (pick === "loan") E.takeLoan(m, p, loan);
+      else if (pick && E.model(m, pick) === "nar") await sellShareFlow(p, pick);
       else if (pick) E.sellHolding(m, p, pick);
       m.changed();
     }
@@ -663,6 +671,37 @@
     m.log({ key: "h.vote", playerId: initiator.id, params: { cell: "#" + id, yes: pct(yes), no: pct(total - yes), res: ok ? "@h.accepted" : "@h.rejected" } });
     return ok;
   };
+  // Selling a share (voluntary or to pay rent): 1) offer to co-owners at nominal value,
+  // 2) if nobody buys — the bank buys out the WHOLE cell from all co-owners in Narmonit → people's property
+  const sellShareFlow = async (p, id) => {
+    const s = E.st(m, id);
+    const share = s.owners[p.id];
+    if (!share) return;
+    const price = E.holdingValue(m, id, p);
+    const unit = unitCur();
+    const coOwners = Object.keys(s.owners).filter((pid) => pid !== p.id).map((pid) => m.player(pid)).filter(Boolean);
+    for (const q of coOwners) {
+      const opts = E.payOpts(m, price).filter((o) => q.wallet.has(o.cur, o.amount));
+      if (!opts.length) continue;
+      let cur = null;
+      if (q.isBot) cur = q.botType === "capitalist" || Math.random() < 0.6 ? opts[0].cur : null;
+      else cur = await ask(q, {
+        title: t("g.shareOffer"), sub: `${nm(id)} · ${p.name}`,
+        rows: [[t("g.share"), `${Math.round(share * 100)}%`], [t("g.price"), fmt(price, unit)]],
+        buttons: [...opts.map((o) => ({ label: `${t("g.buyShare")} · ${fmt(o.amount, o.cur)}`, value: o.cur, primary: true, testid: `share-offer-buy-${o.cur}-btn` })), { label: t("g.no"), value: null, testid: "share-offer-decline-btn" }],
+        closable: false,
+      });
+      if (cur) {
+        E.transferShare(m, id, p, q, opts.find((o) => o.cur === cur));
+        m.log({ key: "h.shareToCoOwner", playerId: q.id, params: { cell: "#" + id, from: p.name, share: `${Math.round(share * 100)}%` } });
+        return m.changed();
+      }
+    }
+    E.nationalize(m, id);
+    m.log({ key: "h.nationalized", playerId: p.id, params: { cell: "#" + id } });
+    m.changed();
+  };
+
   // Buy a share of shared property from its owners at the standard price
   const buyShareFlow = async (id, share) => {
     const p = m.current;
@@ -1087,7 +1126,11 @@
       const s = id && m.cells[id];
       if (id && !s) return;
       if (pr.dataset.prop === "mortgage" && !E.mortgage(m, p, id)) window.MPApp.toast(t("g.noFunds"), "error");
-      if (pr.dataset.prop === "sell") {
+      if (pr.dataset.prop === "sell" && E.model(m, id) === "nar") {
+        const ok = await dialog({ title: t("g.sellShare"), sub: nm(id), rows: [[t("g.share"), `${Math.round(s.owners[p.id] * 100)}%`], [t("g.price"), fmt(E.holdingValue(m, id, p), unitCur())]], html: `<p class="dlg-sub">${t("g.sellShareHint")}</p>`, buttons: [{ label: t("g.sellShare"), value: true, primary: true, testid: "sell-share-confirm-btn" }, { label: t("g.back"), value: null }] });
+        if (!ok) return;
+        await sellShareFlow(p, id);
+      } else if (pr.dataset.prop === "sell") {
         const ok = await dialog({ title: t("g.sellConfirm"), sub: nm(id), rows: [[t("g.youGet"), fmt(E.sellPrice(m, id), E.fiatCur(m))]], buttons: [{ label: t("g.sellBank"), value: true, primary: true, testid: "sell-confirm-btn" }, { label: t("g.back"), value: null }] });
         if (!ok) return;
         E.sellToBank(m, p, id);
