@@ -68,3 +68,11 @@ Build the browser PWA game «Мультиполия» from the spec (Техни�
 - Dialog queue (no orphaned dialogs), openCell try/catch + immediate reopen after rent roll; SW v7 fetch no-cache.
 - 2026-06: Results screen shows each player's bankruptcy counter (result-bankruptcies-<color>), informational only, does not affect points. Self-tested via screenshot.
 - 2026-06: Bankruptcy announcement overlay (#announce, testid bankrupt-announce, 5 s, click to dismiss, sound) driven by new h.bankrupt history entries (works online). Bot share strategy botShares(): capitalist budget 60% cash prefers biggest share; narmonist 35% cheapest; neutral 25% with 35% chance; co-owner offer acceptance capitalist always / narmonist 30% / neutral 50%. Self-tested via Playwright.
+
+## 2026-06 — Session update 3
+- Vercel "Failed to fetch" root cause: committed frontend/.env baked the Emergent preview URL into the Vercel build; backend/.env (committed) points to mongodb://localhost → Vercel function FUNCTION_INVOCATION_FAILED.
+  Fix: index.html MP_API ignores a preview URL when the page is served from another host (same-origin /api), upgrades http→https on https pages; final I18N.apply() after all modules (net.title/net.join showed raw keys when /api/content failed); Mongo serverSelectionTimeoutMS=5000; GET /api/health (db ping).
+  User must set Vercel env: MONGO_URL (Atlas, network access 0.0.0.0/0), DB_NAME, JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD, CORS_ORIGINS=*.
+- Bot decision tips: h.bw.* history entries (buy share / vote / take or skip offered share / joint purchase) with personality reason + toast .bot-tip (testid bot-tip). Not yet e2e verified.
+- Board side labels translated per language (B.label), refresh on language change; left/right labels rotated with letter bottoms toward their cells.
+- Card translations: fixed 5 EN texts with Russian words, 3 UK typos.

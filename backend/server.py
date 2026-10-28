@@ -21,7 +21,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from starlette.middleware.cors import CORSMiddleware
 
-client = AsyncIOMotorClient(os.environ["MONGO_URL"])
+client = AsyncIOMotorClient(os.environ["MONGO_URL"], serverSelectionTimeoutMS=5000)
 db = client[os.environ["DB_NAME"]]
 
 app = FastAPI()
@@ -68,6 +68,15 @@ async def require_admin(authorization: Optional[str]) -> dict:
 class LoginIn(BaseModel):
     email: str
     password: str
+
+
+@api.get("/health")
+async def health():
+    try:
+        await db.command("ping")
+        return {"ok": True, "db": "ok"}
+    except Exception as e:
+        raise HTTPException(503, f"Database unavailable: {type(e).__name__}")
 
 
 @api.post("/auth/login")

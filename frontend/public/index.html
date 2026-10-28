@@ -283,8 +283,13 @@
   <div class="toasts" id="toasts" data-testid="toasts"></div>
 
   <script>
-    // Same-origin "/api" when REACT_APP_BACKEND_URL is not set (e.g. Vercel services on one domain)
-    (function (b) { window.MP_API = (b.indexOf("%") === 0 ? "" : b.replace(/\/$/, "")) + "/api"; })("%REACT_APP_BACKEND_URL%");
+    // Same-origin "/api" when REACT_APP_BACKEND_URL is not set or is a preview URL baked into another host's build (e.g. Vercel)
+    (function (b) {
+      var u = b.indexOf("%") === 0 ? "" : b.replace(/\/$/, "");
+      try { if (u && /\.preview\.emergentagent\.com$/i.test(new URL(u).host) && new URL(u).host !== location.host) u = ""; } catch (e) { u = ""; }
+      if (location.protocol === "https:") u = u.replace(/^http:/i, "https:");
+      window.MP_API = u + "/api";
+    })("%REACT_APP_BACKEND_URL%");
   </script>
   <script src="/js/i18n.js"></script>
   <script src="/js/prices.js"></script>
@@ -299,5 +304,6 @@
   <script src="/js/app.js"></script>
   <script src="/js/net.js"></script>
   <script src="/js/admin.js"></script>
+  <script>window.I18N.apply();</script>
 </body>
 </html>
