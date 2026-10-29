@@ -1,17 +1,22 @@
-/* ===== Board grid: 4 corners + 4 sides × 9 slots, each slot = label + inner ring (11) + outer ring (12) ===== */
+/* ===== Board grid: 4 corners + 4 sides × 9 slots, each slot = label + inner ring (11) + outer ring (12) =====
+   Desktop: square board, ordinary cells are squares (1fr), corners = 2 cells + label (--k) */
 .board {
-  display: grid; padding: 0.6%; gap: 0.25%;
-  grid-template-columns: 1.95fr repeat(9, 1fr) 1.95fr;
-  grid-template-rows: 1.95fr repeat(9, 1fr) 1.95fr;
+  --k: 2.32fr;
+  display: grid; padding: 4px; gap: 2px;
+  grid-template-columns: var(--k) repeat(9, 1fr) var(--k);
+  grid-template-rows: var(--k) repeat(9, 1fr) var(--k);
 }
-.board-center { position: relative; inset: auto; grid-row: 2 / 11; grid-column: 2 / 11; padding: 4%; }
-.slot { display: flex; gap: 3%; min-width: 0; min-height: 0; }
+.board-center { position: relative; inset: auto; grid-row: 2 / 11; grid-column: 2 / 11; padding: 4%; min-width: 0; min-height: 0; }
+.slot { display: flex; gap: 1px; min-width: 0; min-height: 0; }
 .slot--bottom { flex-direction: column; }
 .slot--top { flex-direction: column-reverse; }
 .slot--left { flex-direction: row-reverse; }
 .slot--right { flex-direction: row; }
+.slot .cell { flex: none; aspect-ratio: 1; }
+.slot--top .cell, .slot--bottom .cell { width: 100%; height: auto; }
+.slot--left .cell, .slot--right .cell { height: 100%; width: auto; }
 .slot-label {
-  flex: 0 0 15%; display: grid; place-items: center; overflow: hidden; border-radius: 3px;
+  flex: 1 1 0; min-width: 0; min-height: 0; display: grid; place-items: center; overflow: hidden; border-radius: 3px;
   background: var(--g); color: #06111d; font-size: clamp(5px, 0.5vw, 8px); font-weight: 900; letter-spacing: 0.02em; text-align: center; line-height: 1;
 }
 .slot-label--neutral { color: var(--text-dim); }
@@ -117,6 +122,16 @@
 .chipbtn.is-on { border-color: var(--gold); color: var(--gold); }
 
 .board-center .actions .btn { width: 100%; }
+/* Mobile: 11 square cells across, corners = 1 cell wide × (2 cells + label) tall, side slots overhang into the centre */
+@media (max-width: 900px) {
+  .board { grid-template-columns: repeat(11, 1fr); aspect-ratio: 11 / 13.64; border-radius: 6px; padding: 2px; }
+  .g-center .board { --bw: min(100vw, calc((100dvh - var(--header-h) - 58px - 170px) * 11 / 13.64)); width: var(--bw); max-width: none; margin: 0 calc((100% - var(--bw)) / 2); flex: none; }
+  .slot--left { grid-column: 1 / span 3 !important; justify-self: start; width: calc(232% / 3); }
+  .slot--right { grid-column: 9 / span 3 !important; justify-self: end; width: calc(232% / 3); }
+  .board-center { grid-column: 3 / 10; margin: 0 calc(32% / 7 + 2px); }
+  .corner { padding: 2px 1px; }
+  .corner span:not(.cell-marks) { white-space: normal; word-break: normal; overflow-wrap: normal; letter-spacing: 0; line-height: 1.15; font-size: 4.6px; }
+}
 @media (max-width: 900px) {
   .board-center { padding: 2%; gap: 2px; }
   .board-center .eyebrow { display: none; }

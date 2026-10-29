@@ -180,6 +180,7 @@
     return t(e.key, params) + (e.money ? ` ${moneyText(e.money)}` : "");
   };
   const histItem = (e) => {
+    if (e.key.startsWith("h.bw.")) return ""; // bot explanations are no longer shown (old saves)
     const p = e.playerId && ui.match.player(e.playerId);
     return `<li data-testid="history-entry">${p ? `<span>${esc(p.name)} · </span>` : ""}${esc(histText(e))}</li>`;
   };

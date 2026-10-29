@@ -76,3 +76,7 @@ Build the browser PWA game «Мультиполия» from the spec (Техни�
 - Bot decision tips: h.bw.* history entries (buy share / vote / take or skip offered share / joint purchase) with personality reason + toast .bot-tip (testid bot-tip). Not yet e2e verified.
 - Board side labels translated per language (B.label), refresh on language change; left/right labels rotated with letter bottoms toward their cells.
 - Card translations: fixed 5 EN texts with Russian words, 3 UK typos.
+
+## 2026-06 — Session update 4
+- Bot decision tips REMOVED (no toast, no history lines; old saved h.bw.* entries hidden in histItem).
+- Board grid (board.css only): ordinary cells exact squares (aspect-ratio 1, labels take the remainder); desktop corners square = --k 2.32fr (2 cells + label); mobile (<=900px): 11 cells across, corners 1 cell × (2 cells + label), side slots span 3 columns at 77.3% width, board edge-to-edge (aspect 11/13.64, height-limited). Verified by screenshot measurements (desktop cell 49.1², corner 114²; mobile cell 33.5², corner 33.4×78.6, no overflow).
