@@ -420,12 +420,14 @@
     s.owners = { [winner.id]: 1 };
     refreshBenefit(m, winner);
   };
-  const jointBuy = (m, id, players) => {
+  // Joint purchase part can be paid in $ or Narmonit (curs: player id → chosen currency)
+  const jointOpts = (m, part) => [{ cur: "usd", amount: part }, { cur: "nar", amount: m.bank.usdToNar(part) }];
+  const jointBuy = (m, id, players, curs = {}) => {
     const s = st(m, id);
     const share = 1 / players.length;
     const part = Math.round(price(m, id) * share);
     const paid = players.filter((pl) => {
-      const opts = payOpts(m, part);
+      const opts = jointOpts(m, part).sort((a, b) => (b.cur === curs[pl.id]) - (a.cur === curs[pl.id]));
       const opt = opts.find((o) => pl.wallet.has(o.cur, o.amount));
       return opt && pay(m, pl, opt, "h.jointPart", { cell: "#" + id }) && addSpent(s, pl, opt);
     });
@@ -763,7 +765,7 @@
 
   window.MPEco = {
     L, model, zone, fiatCur, SP, fiatOf, payOpts, canPayAny, st, price, buildCost, rentFor, tariffs, level, soleOwner, propValue, kapPropertyValue,
-    ownedCells, actions, perform, auctionWin, jointBuy, publicBuild, sharedBuild, sharedPlan, canConvert, convertRefunds, convertShared, shareOffers, buyShare, markDone, didAct, mortgage, sellPrice, sellToBank, loanLimit, takeLoan, repayLoans,
+    ownedCells, actions, perform, auctionWin, jointOpts, jointBuy, publicBuild, sharedBuild, sharedPlan, canConvert, convertRefunds, convertShared, shareOffers, buyShare, markDone, didAct, mortgage, sellPrice, sellToBank, loanLimit, takeLoan, repayLoans,
     onLand, onRound, everyTurnStart, statusLabel, refreshBenefit, holdings, holdingValue, sellHolding, setRent, nationalize, transferShare, shortfall, cover, allIn,
   };
 })();

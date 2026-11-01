@@ -817,15 +817,28 @@
       if (!chosen) return;
     }
     const partners = [initiator];
+    const curs = {};
+    // Pay buttons: "Участвовать 42 $" / "Участвовать 0,42 g"; a currency the player lacks is disabled
+    const payBtns = (p, part, tid) => E.jointOpts(m, part).map((o) => ({ label: `${t("g.join")} ${fmt(o.amount, o.cur)}`, value: o.cur, primary: o.cur === "usd", disabled: !p.wallet.has(o.cur, o.amount), testid: `${tid}-${o.cur}-btn` }));
+    const botCur = (p, part) => {
+      const opts = E.jointOpts(m, part).filter((o) => p.wallet.has(o.cur, o.amount));
+      return (opts.find((o) => o.cur === (p.botType === "narmonist" ? "nar" : "usd")) || opts[0] || {}).cur;
+    };
     const part = Math.round(E.price(m, id) / (chosen.length + 1));
     for (const p of chosen) {
-      const can = E.canPayAny(p, E.payOpts(m, part));
-      let ok;
-      if (p.isBot) ok = can && p.botType !== "capitalist";
-      else ok = can && (await ask(p, { title: t("g.joint"), sub: `${nm(id)} · ${p.name}`, rows: [[t("g.part"), fmt(part, m.scenario === "nar_nar" ? "usd" : E.fiatCur(m))]], buttons: [{ label: t("g.join"), value: true, primary: true }, { label: t("g.pass"), value: false }], closable: false }));
-      if (ok) partners.push(p);
+      const can = E.canPayAny(p, E.jointOpts(m, part));
+      let cur = null;
+      if (p.isBot) cur = can && p.botType !== "capitalist" ? botCur(p, part) : null;
+      else if (can) cur = await ask(p, { title: t("g.joint"), sub: `${nm(id)} · ${p.name}`, rows: [[t("g.part"), E.jointOpts(m, part).map((o) => fmt(o.amount, o.cur)).join(" / ")]], buttons: [...payBtns(p, part, "joint-join"), { label: t("g.pass"), value: null, testid: "joint-pass-btn" }], closable: false });
+      if (cur) (partners.push(p), (curs[p.id] = cur));
     }
-    E.jointBuy(m, id, partners);
+    const own = Math.round(E.price(m, id) / partners.length);
+    if (initiator.isBot) curs[initiator.id] = botCur(initiator, own);
+    else {
+      curs[initiator.id] = await ask(initiator, { title: t("g.joint"), sub: `${nm(id)} · ${initiator.name}`, rows: [[t("g.part"), E.jointOpts(m, own).map((o) => fmt(o.amount, o.cur)).join(" / ")]], buttons: [...payBtns(initiator, own, "joint-own"), { label: t("g.back"), value: null, testid: "joint-own-cancel-btn" }], closable: false });
+      if (!curs[initiator.id]) return;
+    }
+    E.jointBuy(m, id, partners, curs);
     m.changed();
   };
 
