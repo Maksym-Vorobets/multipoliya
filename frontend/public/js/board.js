@@ -40,9 +40,8 @@
     ["sky", ["rhea", "enceladus", "titan"], "#3fb7e8"], ["blue", ["umbriel", "oberon", "titania"], "#3a6fe0"],
     ["violet", ["nereid", "proteus", "triton"], "#9a5ad8"], ["pink", ["haumea", "makemake", "eris"], "#d9579e"],
   ];
-  // All prices/rents come from js/prices.js (window.MPPrices.cells)
+  // Names, prices and rents come from game_content_config (js/content-default.js or the server copy), see applyFields
   const STATIONS = ["orion", "pegasus", "kiola", "vega"];
-  const PRICE = window.MPPrices.cells;
   const CORNERS = { 0: "c0", 10: "c10", 20: "c20", 30: "c30" };
   const CORNER_IMG = { c0: "obj-cosmoport", c10: "blackhole", c20: "obj-narmonyon", c30: "obj-anomaly" };
 
@@ -72,15 +71,26 @@
       } else if (STATIONS.includes(token)) kind = "station";
       else if (token === "kvantal" || token === "icite") kind = "utility";
       const c = { id, pos, ring, kind, key, token };
-      if (kind === "planet" || kind === "station" || kind === "utility") {
-        const row = PRICE[`${key}-1${ring}`];
-        Object.assign(c, { price: row.price, build: row.module, dome: row.dome, rent: row.rent });
-        if (kind === "planet") c.group = groupOf[key];
-      }
+      if (kind === "planet") c.group = groupOf[key];
       cells[id] = c;
       return id;
     });
   }
+
+  // Applies config fields to both rings (11 and 12) 1:1 and to the field names
+  const applyFields = (fields) => {
+    const by = Object.fromEntries(fields.map((f) => [f.id, f]));
+    Object.entries(by).forEach(([k, f]) => NAMES[k] && f.name && (NAMES[k] = [f.name.ru || NAMES[k][0], f.name.uk || NAMES[k][1], f.name.en || NAMES[k][2]]));
+    Object.values(cells).forEach((c) => {
+      const f = by[c.key];
+      if (!f || !["planet", "station", "utility"].includes(c.kind)) return;
+      c.price = +f.basePrice || 0;
+      if (f.type === "property") Object.assign(c, { build: +f.modulePrice || 0, dome: +f.domePrice || 0, rent: [+f.baseRent || 0, ...f.rentLevels.map((x) => +x || 0)] });
+      else if (f.type === "station") c.rent = f.rentByCount.map((x) => +x || 0);
+      else c.rent = { one: f.rentTable.one.map((x) => +x || 0), both: f.rentTable.both.map((x) => +x || 0) };
+    });
+  };
+  applyFields(window.MP_CONTENT_DEFAULT.fields);
 
   const groupCells = (gi, ring) => Object.values(cells).filter((c) => c.group === gi && c.ring === ring).map((c) => c.id);
   // Stations (4) and utilities (Kvantal + Icite) form a group inside their own ring
@@ -141,5 +151,5 @@
   };
   const rentTable = (c) => ({ base: c.rent[0], double: c.rent[0] * 2, modules: c.rent.slice(0, 5), dome: c.rent[5] });
 
-  window.MPBoard = { cells, groupOf, order, GROUPS, CORNERS, next, reachable, forwardTo, groupCells, setCells, name, label, art, rentTable, STATIONS };
+  window.MPBoard = { cells, groupOf, order, GROUPS, CORNERS, next, reachable, forwardTo, groupCells, setCells, name, label, art, rentTable, STATIONS, applyFields };
 })();

@@ -12,7 +12,7 @@ import secrets
 import string
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import bcrypt
 import jwt
@@ -119,6 +119,75 @@ async def put_content(body: ContentIn, authorization: Optional[str] = Header(Non
     user = await require_admin(authorization)
     doc = {"key": "main", **body.model_dump(), "updated_at": now().isoformat(), "updated_by": user["email"]}
     await db.content.replace_one({"key": "main"}, doc, upsert=True)
+    return {"ok": True, "updated_at": doc["updated_at"]}
+
+
+# ---------------- game_content_config (field names, prices, rents, Chance/Borgi cards) ----------------
+def money():
+    return Field(default=None, ge=0, le=1_000_000)
+
+
+ACTIONS = Literal["goto", "back", "pay", "payLife", "get", "repair", "patch", "birthday", "allGet", "choice", "mortgagePct", "life", "mixed", "subbotnikOn", "subbotnikOff", "info"]
+
+
+class Names(BaseModel):
+    ru: str = Field(min_length=1, max_length=60)
+    en: str = Field(min_length=1, max_length=60)
+    uk: str = Field(min_length=1, max_length=60)
+
+
+class UtilityRent(BaseModel):
+    one: List[float] = Field(min_length=4, max_length=4)
+    both: List[float] = Field(min_length=4, max_length=4)
+
+
+class FieldCfg(BaseModel):
+    id: str = Field(pattern=r"^[a-z0-9]{1,20}$")
+    type: Literal["property", "station", "utility", "chance", "borgi", "corner"]
+    name: Names
+    colorGroup: Optional[str] = None
+    basePrice: Optional[float] = money()
+    baseRent: Optional[float] = money()
+    modulePrice: Optional[float] = money()
+    domePrice: Optional[float] = money()
+    rentLevels: Optional[List[float]] = Field(default=None, min_length=5, max_length=5)
+    rentByCount: Optional[List[float]] = Field(default=None, min_length=4, max_length=4)
+    rentTable: Optional[UtilityRent] = None
+
+
+class CardText(BaseModel):
+    ru: str = Field(min_length=1, max_length=2000)
+    en: str = Field(min_length=1, max_length=2000)
+    uk: str = Field(min_length=1, max_length=2000)
+
+
+class CardCfg(BaseModel):
+    id: str = Field(max_length=40)
+    type: Literal["chance", "borgi"]
+    actionType: ACTIONS
+    amount: float = Field(default=0, ge=0, le=1_000_000)
+    amount2: float = Field(default=0, ge=0, le=1_000_000)
+    targetFieldId: str = Field(default="", max_length=20)
+    textTemplate: CardText
+
+
+class ContentConfigIn(BaseModel):
+    inflationRate: float = Field(default=0, ge=0, le=100)
+    fields: List[FieldCfg] = Field(min_length=1, max_length=100)
+    cards: Dict[str, List[CardCfg]]
+
+
+@api.get("/content-config")
+async def get_content_config():
+    doc = await db.content.find_one({"key": "game_content_config"}, {"_id": 0, "key": 0})
+    return doc or {}
+
+
+@api.put("/admin/content-config")
+async def put_content_config(body: ContentConfigIn, authorization: Optional[str] = Header(None)):
+    user = await require_admin(authorization)
+    doc = {"key": "game_content_config", **body.model_dump(exclude_none=True), "updated_at": now().isoformat(), "updated_by": user["email"]}
+    await db.content.replace_one({"key": "game_content_config"}, doc, upsert=True)
     return {"ok": True, "updated_at": doc["updated_at"]}
 
 

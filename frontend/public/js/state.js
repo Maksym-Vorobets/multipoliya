@@ -75,19 +75,16 @@
   }
 
   class Bank {
-    constructor(d = {}) {
-      this.goldPrice = d.goldPrice || 100; // $ per 1 g
-      this.priceIndex = d.priceIndex || 1; // fiat multiplier (inflation/deflation)
+    constructor(d = {}, round = () => 1) {
+      this.round = round;
       this.gosFund = d.gosFund || 0;
     }
-    // Fiat prices follow priceIndex; Narmonit amounts stay unchanged
-    fiat(amount) { return Math.round(amount * this.priceIndex); }
+    // Macro inflation: compound % per round from the content config; Narmonit amounts stay unchanged
+    get priceIndex() { return Math.pow(1 + window.MPConfig.inflationRate / 100, Math.max(0, this.round() - 1)); }
+    get goldPrice() { return round2(100 * this.priceIndex); } // $ per 1 g
+    fiat(amount) { return window.MPConfig.calculateFiatPrice(amount, this.round(), window.MPConfig.inflationRate); }
     usdToNar(usd) { return round2(usd / this.goldPrice); }
-    applyIndex(factor) {
-      this.priceIndex = round2(this.priceIndex * factor);
-      this.goldPrice = round2(100 * this.priceIndex);
-    }
-    toJSON() { return { goldPrice: this.goldPrice, priceIndex: this.priceIndex, gosFund: this.gosFund }; }
+    toJSON() { return { gosFund: this.gosFund }; }
   }
 
   class Match extends EventTarget {
@@ -104,7 +101,7 @@
       this.lastRoll = d.lastRoll || null;
       this.moveOptions = d.moveOptions || null;
       this.turnState = d.turnState || Match.freshTurn();
-      this.bank = new Bank(d.bank);
+      this.bank = new Bank(d.bank, () => this.roundNo);
       this.history = new HistoryLog(d.history);
       this.cells = d.cells || {}; // cellId -> ownership/build state
       this.flags = d.flags || {}; // subbotnik, ad bonus rounds, etc.

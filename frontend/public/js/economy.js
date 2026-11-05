@@ -82,8 +82,7 @@
     return m.bank.fiat(base);
   };
   /* ----- stations (4 per ring) and utilities (Kvantal + Icite per ring) ----- */
-  const UTIL_RENT = { 1: [36, 60, 96, 120], 2: [72, 120, 180, 240] }; // dice 2–3 / 4–6 / 7–9 / 10–12
-  const STATION_RENT = [36, 60, 120, 240]; // 1 / 2 / 3 / 4 stations in the group
+  // Rent tables come from the content config: utility rent.one/rent.both by dice 2–3 / 4–6 / 7–9 / 10–12; station rent by 1–4 stations held
   const diceBracket = (sum) => (sum <= 3 ? 0 : sum <= 6 ? 1 : sum <= 9 ? 2 : 3);
   // Shared holdings stack only if their owners overlap by at least 50 %
   const overlap = (x, y) => Object.keys(x.owners).reduce((acc, k) => acc + Math.min(x.owners[k], y.owners[k] || 0), 0);
@@ -111,7 +110,7 @@
     const f = (x) => m.bank.fiat(x);
     const ur = m.turnState && m.turnState.utilRoll;
     const sum = ur && ur.id === id ? ur.sum : null;
-    const table = c.kind === "utility" ? UTIL_RENT[group.n >= 2 ? 2 : 1] : STATION_RENT.slice(0, group.n);
+    const table = c.kind === "utility" ? c.rent[group.n >= 2 ? "both" : "one"] : c.rent.slice(0, group.n);
     const util = c.kind === "utility";
     let choices;
     let roll = false;
@@ -124,7 +123,7 @@
       choices = !util ? [table[table.length - 1]] : sum ? [table[diceBracket(sum)]] : [];
     }
     const min = mdl === "gos" ? choices[0] || table[0] : table[0];
-    const max = mdl === "gos" ? choices[choices.length - 1] || min : util ? table[3] : STATION_RENT[3];
+    const max = mdl === "gos" ? choices[choices.length - 1] || min : util ? table[3] : c.rent[3];
     return { group, min: f(min), max: f(max), choices: choices.map(f), needRoll: roll && !sum };
   };
   // Same holding = same form of ownership AND the same owner(s); people's ≠ shared even with identical players

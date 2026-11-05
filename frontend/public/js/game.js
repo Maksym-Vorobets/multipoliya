@@ -862,10 +862,10 @@
     const sum = window.MPCards.summary(m, d);
     m.log({ key: "h.card", playerId: p.id, params: { deck: `@c.${kind}`, n: d.n, text: sum } });
     const html = `<div class="mp-card mp-card--${kind}" data-testid="card-view"><span class="mp-card-kind">${kind.toUpperCase()} · ${E.L("m_" + d.model)}</span>
-      <p class="mp-card-text" data-testid="card-text">${esc(d.card[lang() === "ru" ? "t" : lang()] || d.card.t)}</p><p class="mp-card-effect" data-testid="card-effect">${esc(sum)}</p></div>`;
+      <p class="mp-card-text" data-testid="card-text">${esc(window.MPCards.text(m, d))}</p><p class="mp-card-effect" data-testid="card-effect">${esc(sum)}</p></div>`;
     const title = `${t("c." + kind)} №${d.n}`;
     let choice = null;
-    if (d.card.e[0] === "choice") {
+    if (d.card.actionType === "choice") {
       choice = p.isBot ? (p.wallet.get(E.fiatCur(m)) > 100 ? "fine" : "chance")
         : await dialog({ title, html, buttons: [{ label: t("c.payFine"), value: "fine", primary: true, testid: "card-fine-btn" }, { label: t("c.drawChance"), value: "chance", testid: "card-chance-btn" }], closable: false });
     } else if (!p.isBot) await dialog({ title, html, buttons: [{ label: t("c.apply"), value: true, primary: true, testid: "card-apply-btn" }], closable: false });

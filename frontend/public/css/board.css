@@ -210,12 +210,20 @@
 .adm-bar .select { min-width: 200px; }
 .adm-list { display: grid; gap: 10px; max-height: 62vh; overflow: auto; padding-right: 4px; }
 .adm-row { display: grid; grid-template-columns: 180px 1fr; gap: 12px; padding: 12px; border-radius: var(--radius); background: var(--surface-glass); border: 1px solid var(--line-cool); }
-.adm-key { font-size: 0.75rem; color: var(--sky); font-weight: 700; word-break: break-all; }
+.adm-key { font-size: 0.75rem; color: var(--sky); font-weight: 700; word-break: break-word; }
 .adm-fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .adm-fields label { display: grid; gap: 4px; font-size: 0.68rem; color: var(--text-mute); font-weight: 800; }
 .adm-fields textarea { width: 100%; resize: vertical; padding: 8px; border-radius: var(--radius-s); background: var(--surface); border: 1px solid var(--line-cool); font-size: 0.82rem; line-height: 1.4; color: var(--text); }
 .adm-fields textarea:focus { outline: none; border-color: var(--gold-soft); }
 .adm-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.adm-key small { display: block; margin-top: 4px; font-size: 0.66rem; color: var(--text-mute); font-weight: 600; }
+.adm-row--cfg > div:last-child { display: grid; gap: 8px; min-width: 0; }
+.adm-nums { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.adm-nums label, .adm-fields--in label { display: grid; gap: 4px; align-content: end; font-size: 0.68rem; color: var(--text-mute); font-weight: 800; }
+.adm-nums input, .adm-nums select, .adm-fields--in input { width: 100%; height: 36px; padding: 0 8px; border-radius: var(--radius-s); background: var(--surface); border: 1px solid var(--line-cool); font-size: 0.85rem; color: var(--text); }
+.adm-nums input:focus, .adm-nums select:focus, .adm-fields--in input:focus { outline: none; border-color: var(--gold-soft); }
+.adm-preview { margin: 0; font-size: 0.78rem; color: var(--text-dim); line-height: 1.4; }
+.adm-preview b { color: var(--gold); }
 @media (max-width: 900px) {
   .adm-row { grid-template-columns: 1fr; }
   .adm-fields { grid-template-columns: 1fr; }

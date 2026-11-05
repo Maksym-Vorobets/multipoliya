@@ -2,7 +2,6 @@
   const B = window.MPBoard;
   const E = window.MPEco;
   const r2 = (n) => Math.round(n * 100) / 100;
-  const GOTO = { pegasus: 15, eris: 39, oberon: 27, titan: 24, moon: 1 };
 
   window.I18N.extend({
     "c.chance": ["Chance", "Chance", "Chance"], "c.borgi": ["Borgi", "Borgi", "Borgi"],
@@ -11,8 +10,6 @@
     "c.pay": ["Оплата {sum}", "Оплата {sum}", "Pay {sum}"], "c.get": ["Получите {sum}", "Отримайте {sum}", "Receive {sum}"],
     "c.repair": ["Ремонт: {a} за модуль, {b} за купол", "Ремонт: {a} за модуль, {b} за купол", "Repairs: {a} per module, {b} per dome"],
     "c.patch": ["Защитный патч от Black Hole", "Захисний патч від Black Hole", "Black Hole protection patch"],
-    "c.inflate": ["Инфляция: цены ×2, 1 г = {gold}", "Інфляція: ціни ×2, 1 г = {gold}", "Inflation: prices ×2, 1 g = {gold}"],
-    "c.deflate": ["Дефляция: цены ÷2 (только при инфляции)", "Дефляція: ціни ÷2 (лише при інфляції)", "Deflation: prices ÷2 (only during inflation)"],
     "c.birthday": ["Каждый игрок дарит вам {sum}", "Кожен гравець дарує вам {sum}", "Every player gives you {sum}"],
     "c.allGet": ["Все игроки получают {sum}", "Усі гравці отримують {sum}", "All players receive {sum}"],
     "c.choice": ["Штраф {sum} или карта «Шанс»", "Штраф {sum} або картка «Шанс»", "Fine {sum} or a Chance card"],
@@ -25,8 +22,6 @@
     "h.card": ["Карточка {deck} №{n}: {text}", "Картка {deck} №{n}: {text}", "{deck} card #{n}: {text}"],
     "h.cardPay": ["Оплата по карточке:", "Оплата за карткою:", "Card payment:"], "h.cardGet": ["Начисление по карточке:", "Нарахування за карткою:", "Card income:"],
     "h.gift": ["Подарок → {to}:", "Подарунок → {to}:", "Gift → {to}:"], "h.patchUsed": ["Защитный патч спас от Black Hole", "Захисний патч врятував від Black Hole", "Patch saved from the Black Hole"],
-    "h.inflation": ["Инфляция: цены ×2, 1 г = {gold} $", "Інфляція: ціни ×2, 1 г = {gold} $", "Inflation: prices ×2, 1 g = {gold} $"],
-    "h.deflation": ["Дефляция: цены ÷2, 1 г = {gold} $", "Дефляція: ціни ÷2, 1 г = {gold} $", "Deflation: prices ÷2, 1 g = {gold} $"],
   });
   const { t } = window.I18N;
 
@@ -35,23 +30,46 @@
   const amt = (m, cur, base) => (cur === "nar" ? r2((base * m.bank.priceIndex) / m.bank.goldPrice) : m.bank.fiat(base));
   const money = (n, cur) => `${cur === "nar" ? n.toFixed(2).replace(".", ",") : n} ${{ usd: "$", rub: "₽", nar: "g" }[cur]}`;
 
+  const deckOf = (key) => window.MPConfig.get().cards[key] || [];
   const draw = (m, cellId, kind) => {
     const model = E.zone(m, cellId);
     const key = `${model}_${kind}`;
-    if (!m.decks[key] || !m.decks[key].length) m.decks[key] = [...Array(18).keys()].sort(() => Math.random() - 0.5);
+    const list = deckOf(key);
+    // reshuffle when empty or when the deck changed in the content editor (stale indices)
+    if (!m.decks[key] || !m.decks[key].length || m.decks[key].some((i) => i >= list.length)) m.decks[key] = [...Array(list.length).keys()].sort(() => Math.random() - 0.5);
     const n = m.decks[key].pop();
-    return { key, model, kind, n: n + 1, card: window.MPCardData[key][n] };
+    return { key, model, kind, n: n + 1, card: list[n] };
+  };
+  // Card action type → [op, a, b] used by the engine
+  const effect = (c) => {
+    const at = c.actionType;
+    if (at === "payLife") return ["pay", +c.amount || 0, 1];
+    if (at === "subbotnikOn" || at === "subbotnikOff") return ["subbotnik", at === "subbotnikOn" ? 1 : 0];
+    if (at === "goto") return ["goto", c.targetFieldId || "c0"];
+    return [at, +c.amount || 0, +c.amount2 || 0];
+  };
+  // goto target: corner id or a field id (same ring as the player)
+  const targetCell = (field, ring) => {
+    if (B.cells[field]) return field;
+    const c = Object.values(B.cells).find((x) => x.key === field && x.ring === (ring || 1));
+    return c ? c.id : "c0";
+  };
+  const MONEY = ["pay", "get", "repair", "birthday", "allGet", "choice", "life", "mixed"];
+  // Card text from its template with current field names and sums (deck currency, inflation applied)
+  const text = (m, d) => {
+    const cur = deckCur(m, d.model);
+    const isMoney = MONEY.includes(effect(d.card)[0]);
+    return window.MPConfig.parseCardTemplate(d.card, window.MPConfig.get().fields, { fmt: (n) => (isMoney ? money(amt(m, cur, n), cur) : String(Math.round(n))) });
   };
 
   const summary = (m, d) => {
-    const [op, a, b] = d.card.e;
+    const [op, a, b] = effect(d.card);
     const cur = deckCur(m, d.model);
     const s = (x) => money(amt(m, cur, x), cur);
-    const target = op === "goto" ? (GOTO[a] != null ? `${GOTO[a]}-${m.current.ring || 1}` : a) : null;
     return {
-      goto: () => t("c.goto", { cell: B.name(target, window.I18N.lang) }), back: () => t("c.back", { n: a }), pay: () => t("c.pay", { sum: s(a) }),
+      goto: () => t("c.goto", { cell: B.name(targetCell(a, m.current.ring), window.I18N.lang) }), back: () => t("c.back", { n: a }), pay: () => t("c.pay", { sum: s(a) }),
       get: () => t("c.get", { sum: s(a) }), repair: () => t("c.repair", { a: s(a), b: s(b) }), patch: () => t("c.patch"),
-      inflate: () => t("c.inflate", { gold: `${m.bank.goldPrice * 2} $` }), deflate: () => t("c.deflate"), birthday: () => t("c.birthday", { sum: s(a) }),
+      birthday: () => t("c.birthday", { sum: s(a) }),
       allGet: () => t("c.allGet", { sum: s(a) }), choice: () => t("c.choice", { sum: s(a) }), mortgagePct: () => t("c.mortgagePct", { n: a }),
       life: () => t("c.life", { sum: s(a) }), mixed: () => t("c.mixed", { sum: s(a), life: s(b) }), subbotnik: () => t(a ? "c.subOn" : "c.subOff"), info: () => t("c.info"),
     }[op]();
@@ -74,14 +92,14 @@
 
   // Applies a card. Returns { path } for move cards, { choice } when the player must choose
   const apply = (m, p, d, choice) => {
-    const [op, a, b] = d.card.e;
+    const [op, a, b] = effect(d.card);
     const cur = deckCur(m, d.model);
     const A = amt(m, cur, a || 0);
     const B_ = amt(m, cur, b || 0);
     const active = m.players.filter((q) => q.status !== "bankrupt");
     switch (op) {
       case "goto": {
-        const target = GOTO[a] != null ? `${GOTO[a]}-${p.ring || 1}` : a;
+        const target = targetCell(a, p.ring);
         if (target === "c10") return { path: [target] };
         return { path: B.forwardTo(p.cell, p.ring || 1, (c) => c.id === target) };
       }
@@ -102,10 +120,6 @@
         return;
       }
       case "patch": p.restrictions.patch = (p.restrictions.patch || 0) + 1; return;
-      case "inflate": m.bank.applyIndex(2); m.log({ key: "h.inflation", params: { gold: m.bank.goldPrice } }); return;
-      case "deflate":
-        if (m.bank.priceIndex > 1) { m.bank.applyIndex(0.5); m.log({ key: "h.deflation", params: { gold: m.bank.goldPrice } }); }
-        return;
       case "birthday":
         active.filter((q) => q !== p).forEach((q) => {
           const c = q.wallet.has(cur, A) ? cur : null;
@@ -128,5 +142,5 @@
     }
   };
 
-  window.MPCards = { draw, apply, summary };
+  window.MPCards = { draw, apply, summary, text, effect, MONEY };
 })();
