@@ -5,9 +5,9 @@
   let cfg = clone(D);
   let version = 0;
 
-  // Compound inflation: base × (1 + rate%)^(round − 1)
-  const calculateFiatPrice = (basePrice, currentRound, inflationRate) =>
-    Math.round(basePrice * Math.pow(1 + (inflationRate || 0) / 100, Math.max(0, (currentRound || 1) - 1)));
+  // Compound inflation, indexed every 10 rounds: base × (1 + rate%)^floor(round / 10)
+  const indexFactor = (currentRound, inflationRate) => Math.pow(1 + (inflationRate || 0) / 100, Math.floor((currentRound || 0) / 10));
+  const calculateFiatPrice = (basePrice, currentRound, inflationRate) => Math.round(basePrice * indexFactor(currentRound, inflationRate));
 
   const fieldName = (fields, id, lang) => {
     const f = fields.find((x) => x.id === id);
@@ -25,8 +25,10 @@
   const merge = (c) => {
     const base = clone(D);
     const byId = Object.fromEntries((c.fields || []).map((f) => [f.id, f]));
+    const rate = (k) => (c[k] != null && Number.isFinite(+c[k]) ? Math.min(10, Math.max(0, +c[k])) : base[k]);
     return {
-      inflationRate: Number.isFinite(+c.inflationRate) ? +c.inflationRate : base.inflationRate,
+      defaultInflationRate: rate("defaultInflationRate"),
+      defaultCreditRate: rate("defaultCreditRate"),
       fields: base.fields.map((f) => (byId[f.id] ? { ...f, ...byId[f.id], type: f.type, name: { ...f.name, ...(byId[f.id].name || {}) } } : f)),
       cards: Object.fromEntries(Object.entries(base.cards).map(([d, l]) => [d, Array.isArray(c.cards && c.cards[d]) && c.cards[d].length ? c.cards[d] : l])),
     };
@@ -43,7 +45,9 @@
     .catch(() => {});
 
   window.MPConfig = {
-    get: () => cfg, defaults: () => clone(D), apply, calculateFiatPrice, parseCardTemplate,
-    get version() { return version; }, get inflationRate() { return cfg.inflationRate || 0; },
+    get: () => cfg, defaults: () => clone(D), merge, apply, calculateFiatPrice, indexFactor, parseCardTemplate,
+    get version() { return version; },
+    // Starting macro settings for a new match (players can change them on the setup screen)
+    macroDefaults: () => ({ inflationRate: cfg.defaultInflationRate, creditRate: cfg.defaultCreditRate }),
   };
 })();

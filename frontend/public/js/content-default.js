@@ -2,7 +2,8 @@
 // fields: base values in $ (Kapmonia/Narmonia) or ₽ (Gosmonia); both rings (11 and 12) use the same values.
 // cards: textTemplate placeholders {{amount}}, {{amount2}}, {{amount/2}}, {{field_<id>_name}}
 window.MP_CONTENT_DEFAULT = {
-  inflationRate: 0,
+  defaultInflationRate: 5,
+  defaultCreditRate: 2,
   fields: [
     {"id":"moon","type":"property","name":{"ru":"Луна","en":"Moon","uk":"Місяць"},"colorGroup":"red","basePrice":60,"baseRent":6,"modulePrice":50,"domePrice":40,"rentLevels":[21,69,165,210,240]},
     {"id":"vesta","type":"property","name":{"ru":"Веста","en":"Vesta","uk":"Веста"},"colorGroup":"red","basePrice":60,"baseRent":6,"modulePrice":50,"domePrice":40,"rentLevels":[21,69,165,210,240]},

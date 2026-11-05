@@ -97,9 +97,20 @@
         </div>
         <div class="scenario-grid" id="scenario-grid" data-testid="scenario-grid"></div>
         <div class="panel panel--gold selected-scenario" data-testid="selected-scenario">
-          <p class="eyebrow" data-i18n="setup.selected">Выбранный сценарий</p>
-          <h2 class="h2" id="sel-scn-name"></h2>
-          <p class="sub" id="sel-scn-desc"></p>
+          <div class="sel-info">
+            <p class="eyebrow" data-i18n="setup.selected">Выбранный сценарий</p>
+            <h2 class="h2" id="sel-scn-name"></h2>
+            <p class="sub" id="sel-scn-desc"></p>
+          </div>
+          <div class="macro" data-testid="macro-settings">
+            <label class="macro-row"><span data-i18n="setup.inflation">Инфляция</span>
+              <input type="range" min="0" max="10" step="0.5" data-macro="inflationRate" data-testid="inflation-slider" />
+              <output data-macro-val="inflationRate" data-testid="inflation-value"></output></label>
+            <label class="macro-row"><span data-i18n="setup.credit">Кредитная ставка</span>
+              <input type="range" min="0" max="10" step="0.5" data-macro="creditRate" data-testid="credit-slider" />
+              <output data-macro-val="creditRate" data-testid="credit-value"></output></label>
+            <p class="macro-hint" data-i18n="setup.macroHint">Индексация цен и проценты по кредиту — каждые 10 раундов</p>
+          </div>
         </div>
       </div>
 

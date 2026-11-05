@@ -15,7 +15,16 @@
     "adm.search": ["Поиск по ключу или тексту", "Пошук за ключем або текстом", "Search by key or text"], "adm.shown": ["Показано {n} из {total}", "Показано {n} з {total}", "Showing {n} of {total}"],
     "adm.reset": ["Сбросить к исходному", "Скинути до початкового", "Reset to default"], "adm.back": ["На главный экран", "На головний екран", "Main screen"],
     "adm.html": ["Поддерживается HTML: <h4>, <p>, <b>", "Підтримується HTML: <h4>, <p>, <b>", "HTML supported: <h4>, <p>, <b>"],
-    "adm.content": ["Редактор контента", "Редактор контенту", "Content editor"], "adm.fields": ["Поля", "Поля", "Fields"],
+    "adm.content": ["Редактор контента", "Редактор контенту", "Content editor"],
+    "adm.presets": ["Пресеты", "Пресети", "Presets"], "adm.noPresets": ["Нет сохранённых пресетов", "Немає збережених пресетів", "No saved presets"],
+    "adm.load": ["Загрузить", "Завантажити", "Load"], "adm.presetName": ["Название пресета", "Назва пресету", "Preset name"],
+    "adm.saveAsPreset": ["Сохранить как новый пресет", "Зберегти як новий пресет", "Save as new preset"], "adm.toDefault": ["Вернуть по умолчанию", "Повернути за замовчуванням", "Restore defaults"],
+    "adm.presetSaved": ["Пресет сохранён", "Пресет збережено", "Preset saved"], "adm.presetLoaded": ["Пресет загружен в редактор. Нажмите «Сохранить изменения», чтобы применить в игре.", "Пресет завантажено в редактор. Натисніть «Зберегти зміни», щоб застосувати в грі.", "Preset loaded into the editor. Press “Save changes” to apply it in the game."],
+    "adm.defaultsLoaded": ["Значения по умолчанию загружены в редактор", "Значення за замовчуванням завантажено в редактор", "Defaults loaded into the editor"],
+    "adm.presetNameRequired": ["Введите название пресета", "Введіть назву пресету", "Enter a preset name"],
+    "adm.macro": ["Глобальная макроэкономика (по умолчанию)", "Глобальна макроекономіка (за замовчуванням)", "Global macroeconomics (defaults)"],
+    "adm.macroHint": ["Стартовые значения ползунков на экране «Новая партия». Индексация цен и проценты по кредиту — каждые 10 раундов.", "Стартові значення повзунків на екрані «Нова партія». Індексація цін і відсотки за кредитом — кожні 10 раундів.", "Starting slider values on the “New game” screen. Price indexation and loan interest — every 10 rounds."],
+    "adm.inflation": ["Инфляция по умолчанию", "Інфляція за замовчуванням", "Default inflation"], "adm.credit": ["Кредитная ставка по умолчанию", "Кредитна ставка за замовчуванням", "Default credit rate"], "adm.fields": ["Поля", "Поля", "Fields"],
     "adm.fieldsHint": ["Значения задаются один раз на поле и применяются к обоим кругам (11 и 12). Базовые суммы в $ (₽ в Госмонии), инфляция применяется в игре автоматически.", "Значення задаються один раз на поле і застосовуються до обох кіл (11 і 12). Базові суми в $ (₽ у Госмонії), інфляція застосовується в грі автоматично.", "Values are set once per field and apply to both rings (11 and 12). Base sums in $ (₽ in Gosmonia); inflation is applied in game automatically."],
     "adm.cardsHint": ["Подстановки в тексте: {{amount}}, {{amount2}}, {{amount/2}}, {{field_ID_name}} (например {{field_pegasus_name}}). Суммы показываются в валюте колоды с учётом инфляции.", "Підстановки в тексті: {{amount}}, {{amount2}}, {{amount/2}}, {{field_ID_name}} (наприклад {{field_pegasus_name}}). Суми показуються у валюті колоди з урахуванням інфляції.", "Text placeholders: {{amount}}, {{amount2}}, {{amount/2}}, {{field_ID_name}} (e.g. {{field_pegasus_name}}). Sums are shown in the deck currency with inflation."],
     "adm.f.basePrice": ["Цена участка", "Ціна ділянки", "Plot price"], "adm.f.stPrice": ["Цена станции", "Ціна станції", "Station price"], "adm.f.utPrice": ["Цена покупки", "Ціна купівлі", "Purchase price"],
@@ -46,6 +55,8 @@
   let deck = "fields";
   let query = "";
   let cc = null; // game_content_config draft
+  let presets = null; // [{ id, presetName, createdAt }]
+  let presetName = "";
   const draft = () => (cc = cc || JSON.parse(JSON.stringify(window.MPConfig.get())));
 
   const req = async (method, path, body) => {
@@ -111,6 +122,23 @@
     }).join("");
   };
 
+  const loadPresets = () => req("GET", "/admin/presets").then((list) => ((presets = list), render())).catch(() => {});
+  const rate = (k, label) => `<label class="macro-row"><span>${esc(label)}</span><input type="range" min="0" max="10" step="0.5" value="${draft()[k]}" data-cfgrate="${k}" data-testid="adm-${k}-slider" /><output data-cfgrate-val="${k}" data-testid="adm-${k}-value">${draft()[k]}%</output></label>`;
+  const topBlock = () => {
+    if (presets === null) loadPresets();
+    const list = presets || [];
+    const opts = list.length ? list.map((p) => `<option value="${esc(p.id)}">${esc(p.presetName)} · ${esc(new Date(p.createdAt).toLocaleString(I.lang))}</option>`).join("") : `<option value="">${esc(t("adm.noPresets"))}</option>`;
+    return `<div class="adm-top" data-testid="adm-content-top">
+      <div class="adm-box" data-testid="adm-presets"><h3>${esc(t("adm.presets"))}</h3>
+        <div class="adm-inline"><div class="select"><select id="adm-preset-select" data-testid="adm-preset-select">${opts}</select></div>
+          <button class="btn btn--sm" id="adm-preset-load" ${list.length ? "" : "disabled"} data-testid="adm-preset-load-btn">${esc(t("adm.load"))}</button></div>
+        <div class="adm-inline"><input id="adm-preset-name" maxlength="60" value="${esc(presetName)}" placeholder="${esc(t("adm.presetName"))}" data-testid="adm-preset-name-input" />
+          <button class="btn btn--sm btn--primary" id="adm-preset-save" data-testid="adm-preset-save-btn">${esc(t("adm.saveAsPreset"))}</button></div>
+        <button class="btn btn--sm" id="adm-preset-default" data-testid="adm-preset-default-btn">${esc(t("adm.toDefault"))}</button></div>
+      <div class="adm-box macro" data-testid="adm-macro"><h3>${esc(t("adm.macro"))}</h3>${rate("defaultInflationRate", t("adm.inflation"))}${rate("defaultCreditRate", t("adm.credit"))}<p class="macro-hint">${esc(t("adm.macroHint"))}</p></div>
+    </div>`;
+  };
+
   const render = () => {
     const logged = !!token;
     $("#admin-login").hidden = logged;
@@ -130,13 +158,17 @@
       html = `<p class="sub sub--xs">${t("adm.shown", { n: Math.min(60, keys.length), total: keys.length })}</p>` +
         keys.slice(0, 60).map((k) => row(k, LANGS.map(([l, L]) => field(L, textVal(l, k), `data-text="${k}" data-lang="${l}" data-testid="adm-text-${k}-${l}"`)))).join("");
     }
-    if (tab === "content") html = deck === "fields" ? fieldsEditor() : cardsEditor();
+    if (tab === "content") html = topBlock() + (deck === "fields" ? fieldsEditor() : cardsEditor());
     $("#admin-list").innerHTML = html;
   };
 
   document.addEventListener("input", (e) => {
     const el = e.target;
-    if (el.dataset.text) {
+    if (el.dataset.cfgrate) {
+      draft()[el.dataset.cfgrate] = +el.value;
+      document.querySelector(`[data-cfgrate-val="${el.dataset.cfgrate}"]`).textContent = `${el.value}%`;
+    } else if (el.id === "adm-preset-name") presetName = el.value;
+    else if (el.dataset.text) {
       (content.texts[el.dataset.lang] = content.texts[el.dataset.lang] || {})[el.dataset.text] = el.value;
     } else if (el.dataset.cf != null || el.dataset.cc != null) {
       const target = el.dataset.cf != null ? draft().fields[+el.dataset.cf] : draft().cards[deck][+el.dataset.cc];
@@ -178,6 +210,28 @@
       token = null;
       sessionStorage.removeItem("mp.admin");
       render();
+    }
+    if (b.id === "adm-preset-default") {
+      cc = window.MPConfig.defaults();
+      render();
+      return window.MPApp.toast(t("adm.defaultsLoaded"));
+    }
+    if (b.id === "adm-preset-load" || b.id === "adm-preset-save") {
+      try {
+        if (b.id === "adm-preset-load") {
+          const doc = await req("GET", `/admin/presets/${encodeURIComponent($("#adm-preset-select").value)}`);
+          cc = window.MPConfig.merge(doc.configData);
+          render();
+          return window.MPApp.toast(t("adm.presetLoaded"));
+        }
+        if (!presetName.trim()) return window.MPApp.toast(t("adm.presetNameRequired"), "error");
+        await req("POST", "/admin/presets", { presetName: presetName.trim(), configData: draft() });
+        presetName = "";
+        window.MPApp.toast(t("adm.presetSaved"));
+        return loadPresets();
+      } catch (err) {
+        return window.MPApp.toast(err.message, "error");
+      }
     }
     if (b.id === "admin-reset-btn") {
       if (tab === "content") return ((cc = window.MPConfig.defaults()), render());

@@ -172,7 +172,8 @@ class CardCfg(BaseModel):
 
 
 class ContentConfigIn(BaseModel):
-    inflationRate: float = Field(default=0, ge=0, le=100)
+    defaultInflationRate: float = Field(default=5, ge=0, le=10)
+    defaultCreditRate: float = Field(default=2, ge=0, le=10)
     fields: List[FieldCfg] = Field(min_length=1, max_length=100)
     cards: Dict[str, List[CardCfg]]
 
@@ -191,6 +192,35 @@ async def put_content_config(body: ContentConfigIn, authorization: Optional[str]
     return {"ok": True, "updated_at": doc["updated_at"]}
 
 
+# ---------------- game_presets (saved content configurations) ----------------
+class PresetIn(BaseModel):
+    presetName: str = Field(min_length=1, max_length=60)
+    configData: ContentConfigIn
+
+
+@api.get("/admin/presets")
+async def list_presets(authorization: Optional[str] = Header(None)):
+    await require_admin(authorization)
+    return await db.game_presets.find({}, {"_id": 0, "configData": 0}).sort("createdAt", -1).to_list(200)
+
+
+@api.get("/admin/presets/{preset_id}")
+async def get_preset(preset_id: str, authorization: Optional[str] = Header(None)):
+    await require_admin(authorization)
+    doc = await db.game_presets.find_one({"id": preset_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Preset not found")
+    return doc
+
+
+@api.post("/admin/presets")
+async def create_preset(body: PresetIn, authorization: Optional[str] = Header(None)):
+    await require_admin(authorization)
+    doc = {"id": secrets.token_hex(8), "presetName": body.presetName.strip(), "configData": body.configData.model_dump(exclude_none=True), "createdAt": now().isoformat()}
+    await db.game_presets.insert_one({**doc})
+    return {"id": doc["id"], "presetName": doc["presetName"], "createdAt": doc["createdAt"]}
+
+
 # ---------------- Online rooms (host-authoritative state sync) ----------------
 class RoomCreate(BaseModel):
     scenario: str
@@ -198,6 +228,8 @@ class RoomCreate(BaseModel):
     real: int = Field(ge=2, le=4)
     bots: List[str] = Field(default_factory=list)
     hostName: str = Field(min_length=1, max_length=16)
+    inflationRate: Optional[float] = Field(default=None, ge=0, le=10)
+    creditRate: Optional[float] = Field(default=None, ge=0, le=10)
 
 
 class JoinIn(BaseModel):
@@ -220,7 +252,7 @@ class AnswerIn(BaseModel):
 
 def public_room(room: dict, seat: Optional[int], since: int) -> dict:
     return {
-        "code": room["code"], "status": room["status"], "scenario": room["scenario"], "version": room["version"],
+        "code": room["code"], "status": room["status"], "scenario": room["scenario"], "macro": room.get("macro"), "version": room["version"],
         "hostSeat": 0, "seats": [{k: v for k, v in s.items() if k != "token"} for s in room["seats"]],
         "state": room.get("state") if room["version"] > since else None,
         "prompts": [p for p in room.get("prompts", []) if p["to"] == seat and not p["answered"]],
@@ -295,7 +327,8 @@ async def create_room(body: RoomCreate):
             "name": body.hostName if i == 0 else None, "joined": i == 0 or not human,
             **({"token": token} if i == 0 else {}),
         })
-    room = {"code": code, "status": "lobby", "scenario": body.scenario, "version": 0, "seats": seats, "prompts": [], "created_at": now().isoformat(), "created_dt": now()}
+    macro = {"inflationRate": body.inflationRate, "creditRate": body.creditRate} if body.inflationRate is not None and body.creditRate is not None else None
+    room = {"code": code, "status": "lobby", "scenario": body.scenario, "macro": macro, "version": 0, "seats": seats, "prompts": [], "created_at": now().isoformat(), "created_dt": now()}
     await db.rooms.insert_one(room)
     return {"code": code, "token": token, "seat": 0, "room": public_room(room, 0, -1)}
 

@@ -3,6 +3,7 @@
   const SAVE_KEY = "mp.match";
   const uid = () => Math.random().toString(36).slice(2, 10);
   const round2 = (n) => Math.round(n * 100) / 100;
+  const GOLD_BASE = 100; // goldBasePrice: $ per 1 g at round 0
 
   // Scenario economic config (start sums, per-round payments)
   const SCENARIO_RULES = {
@@ -75,14 +76,15 @@
   }
 
   class Bank {
-    constructor(d = {}, round = () => 1) {
+    constructor(d = {}, round = () => 1, rate = () => 0) {
       this.round = round;
+      this.rate = rate;
       this.gosFund = d.gosFund || 0;
     }
-    // Macro inflation: compound % per round from the content config; Narmonit amounts stay unchanged
-    get priceIndex() { return Math.pow(1 + window.MPConfig.inflationRate / 100, Math.max(0, this.round() - 1)); }
-    get goldPrice() { return round2(100 * this.priceIndex); } // $ per 1 g
-    fiat(amount) { return window.MPConfig.calculateFiatPrice(amount, this.round(), window.MPConfig.inflationRate); }
+    // Macro inflation of the match (indexed every 10 rounds); gold (1 g) is indexed too, so Narmonit = fiat / gold price
+    get priceIndex() { return window.MPConfig.indexFactor(this.round(), this.rate()); }
+    get goldPrice() { return round2(GOLD_BASE * this.priceIndex); } // $ per 1 g
+    fiat(amount) { return window.MPConfig.calculateFiatPrice(amount, this.round(), this.rate()); }
     usdToNar(usd) { return round2(usd / this.goldPrice); }
     toJSON() { return { gosFund: this.gosFund }; }
   }
@@ -101,18 +103,20 @@
       this.lastRoll = d.lastRoll || null;
       this.moveOptions = d.moveOptions || null;
       this.turnState = d.turnState || Match.freshTurn();
-      this.bank = new Bank(d.bank, () => this.roundNo);
+      this.macro = d.macro || window.MPConfig.macroDefaults(); // { inflationRate, creditRate } in %
+      this.bank = new Bank(d.bank, () => this.roundNo, () => this.macro.inflationRate);
       this.history = new HistoryLog(d.history);
       this.cells = d.cells || {}; // cellId -> ownership/build state
       this.flags = d.flags || {}; // subbotnik, ad bonus rounds, etc.
       this.decks = d.decks || {}; // shuffled Chance/Borgi decks
     }
 
-    static create({ scenario, currencies, players }) {
+    static create({ scenario, currencies, players, macro }) {
       const rules = SCENARIO_RULES[scenario];
       const m = new Match({
         scenario,
         currencies,
+        macro,
         players: players.map((p) => new Player({ ...p, wallet: rules.start, status: "benefit" })),
       });
       m.log({ key: "h.created", params: { scenario: `@scn.${scenario}.name` } });
@@ -233,8 +237,8 @@
 
     /* ----- persistence ----- */
     toJSON() {
-      const { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells, moveOptions, turnState, flags, decks } = this;
-      return { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells, moveOptions, turnState, flags, decks };
+      const { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells, moveOptions, turnState, flags, decks, macro } = this;
+      return { id, scenario, currencies, players, active, turnNo, roundNo, phase, lastRoll, bank, history, cells, moveOptions, turnState, flags, decks, macro };
     }
     save() {
       if (!this.online) localStorage.setItem(SAVE_KEY, JSON.stringify(this));

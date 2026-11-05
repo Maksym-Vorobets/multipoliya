@@ -655,7 +655,7 @@
   const loanLimit = (m, p) => Math.max(0, kapPropertyValue(m, p) - p.loans.reduce((a, l) => a + l.principal, 0));
   const takeLoan = (m, p, amount) => {
     if (amount <= 0 || amount > loanLimit(m, p)) return false;
-    p.loans.push({ principal: amount, debt: Math.round(amount * 1.05) });
+    p.loans.push({ principal: amount, debt: amount });
     m.credit(p, fiatCur(m), amount, "h.loan");
     return true;
   };
@@ -695,16 +695,22 @@
 
   const everyTurnStart = (m, p) => {
     p.turnsTaken = (p.turnsTaken || 0) + 1;
-    if (p.turnsTaken % 10 !== 0 || !p.loans.length) return;
-    const cur = fiatCur(m);
-    p.loans.forEach((l) => {
-      const due = Math.min(l.debt, Math.round(l.principal * 0.03));
-      if (!p.wallet.has(cur, due) && loanLimit(m, p) >= due) takeLoan(m, p, due);
-      if (m.debit(p, cur, due, "h.loanPay")) l.debt -= due;
-      else p.status = "benefit";
-    });
-    p.loans = p.loans.filter((l) => l.debt > 0);
   };
+  // Debt service every 10 rounds: loan principal × creditRate %, the principal itself stays until repaid
+  const loanInterest = (m, p) => Math.round(p.loans.reduce((a, l) => a + l.principal, 0) * ((m.macro && m.macro.creditRate) || 0) / 100);
+  const interestDue = (m, p) => m.roundNo % 10 === 0 && ((m.flags.interest || {})[p.id] !== m.roundNo) && loanInterest(m, p) > 0;
+  // Own Kapmonia cells with buildings: sell one dome / module to the bank at half its price
+  const buildingCells = (m, p) => Object.keys(m.cells).filter((id) => model(m, id) === "kap" && soleOwner(m.cells[id]) === p.id && (m.cells[id].modules > 0 || m.cells[id].dome));
+  const buildingRefund = (m, id) => Math.round(buildCost(m, id, m.cells[id].dome ? "dome" : "module") / 2);
+  const sellBuilding = (m, p, id) => {
+    const s = st(m, id);
+    const sum = buildingRefund(m, id);
+    if (s.dome) s.dome = false;
+    else s.modules -= 1;
+    m.credit(p, fiatCur(m), sum, "h.sellBuilding", { cell: "#" + id });
+  };
+  const mortgageable = (m, p) => Object.keys(m.cells).filter((id) => model(m, id) === "kap" && soleOwner(m.cells[id]) === p.id && !m.cells[id].mortgaged && !m.cells[id].modules && !m.cells[id].dome);
+  const mortgageValue = (m, id) => Math.round((price(m, id) * SP.mortgagePercent) / 100);
 
   const onRound = (m, roundNo) => {
     const active = m.players.filter((pl) => pl.status !== "bankrupt");
@@ -765,6 +771,6 @@
   window.MPEco = {
     L, model, zone, fiatCur, SP, fiatOf, payOpts, canPayAny, st, price, buildCost, rentFor, tariffs, level, soleOwner, propValue, kapPropertyValue,
     ownedCells, actions, perform, auctionWin, jointOpts, jointBuy, publicBuild, sharedBuild, sharedPlan, canConvert, convertRefunds, convertShared, shareOffers, buyShare, markDone, didAct, mortgage, sellPrice, sellToBank, loanLimit, takeLoan, repayLoans,
-    onLand, onRound, everyTurnStart, statusLabel, refreshBenefit, holdings, holdingValue, sellHolding, setRent, nationalize, transferShare, shortfall, cover, allIn,
+    onLand, onRound, everyTurnStart, loanInterest, interestDue, buildingCells, buildingRefund, sellBuilding, mortgageable, mortgageValue, statusLabel, refreshBenefit, holdings, holdingValue, sellHolding, setRent, nationalize, transferShare, shortfall, cover, allIn,
   };
 })();

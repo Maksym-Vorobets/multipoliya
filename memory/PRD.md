@@ -80,3 +80,12 @@ Build the browser PWA game «Мультиполия» from the spec (Техни�
 ## 2026-06 — Session update 4
 - Bot decision tips REMOVED (no toast, no history lines; old saved h.bw.* entries hidden in histItem).
 - Board grid (board.css only): ordinary cells exact squares (aspect-ratio 1, labels take the remainder); desktop corners square = --k 2.32fr (2 cells + label); mobile (<=900px): 11 cells across, corners 1 cell × (2 cells + label), side slots span 3 columns at 77.3% width, board edge-to-edge (aspect 11/13.64, height-limited). Verified by screenshot measurements (desktop cell 49.1², corner 114²; mobile cell 33.5², corner 33.4×78.6, no overflow).
+
+## 2026-06 — Session update 5 (CMS, presets, macroeconomics)
+- Joint purchase (Narmonia): partner dialog has 3 buttons «Участвовать N $», «Участвовать X g», «Отказаться» (unaffordable currency disabled); initiator also picks $/g (or «Назад» cancels). E.jointOpts / E.jointBuy(m,id,players,curs).
+- game_content_config: js/content-default.js (fallback) + db.content {key:"game_content_config"}; GET /api/content-config, PUT /api/admin/content-config. js/config.js = MPConfig {get, merge, apply, calculateFiatPrice, indexFactor, parseCardTemplate, macroDefaults}. board.js applyFields → both rings 1:1 (names RU/EN/UA, basePrice, baseRent, modulePrice, domePrice, rentLevels[5], station rentByCount[4], utility rentTable one/both [4] by dice 2–3/4–6/7–9/10–12).
+- Cards: {id,type,actionType,amount,amount2,targetFieldId,textTemplate{ru,en,uk}} with {{amount}}, {{amount2}}, {{amount/N}}, {{field_<id>_name}}. Inflation/Deflation cards REMOVED (kap/nar decks 16 cards, gos 18). cards-data.js no longer loaded.
+- Admin «Редактор контента» tab (replaced «Карточки»): select Поля / 6 decks; presets block (GET/POST /api/admin/presets, GET /api/admin/presets/{id}; collection game_presets {id,presetName,configData,createdAt}); «Вернуть по умолчанию»; sliders defaultInflationRate (5) / defaultCreditRate (2), 0–10%.
+- Setup screen: inflation & credit sliders inside «Выбранный сценарий» (init from config defaults) → match.macro; online rooms carry macro (RoomCreate inflationRate/creditRate).
+- Engine: calculateFiatPrice(base, round, rate) = round(base × (1+rate/100)^floor(round/10)); gold price = 100 × same factor; Narmonit = fiat / gold.
+- Loans: no +5% markup, no 3% installments; every 10th round at the player's turn start interest = principal × creditRate% (flags.interest). Not enough cash → dialog: extra loan / sell module or dome at half price / mortgage / bankruptcy (benefit status). Bots auto-pick in that order.

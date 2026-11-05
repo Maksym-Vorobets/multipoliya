@@ -34,7 +34,13 @@
 .scn-card.is-active .chip { border-color: var(--gold); color: var(--gold); }
 .scn-cta { margin-top: auto; font-weight: 700; font-size: 0.82rem; }
 .scn-card.is-active .scn-cta { color: var(--gold); }
-.selected-scenario { padding: 18px 20px; }
+.selected-scenario { padding: 18px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px 28px; }
+.sel-info { flex: 1 1 260px; min-width: 0; }
+.macro { flex: 0 1 300px; display: grid; gap: 10px; }
+.macro-row { display: grid; grid-template-columns: 112px 1fr 44px; align-items: center; gap: 10px; font-size: 0.78rem; font-weight: 700; color: var(--text-dim); }
+.macro-row output { font-weight: 800; color: var(--gold); text-align: right; font-variant-numeric: tabular-nums; }
+.macro-row input[type="range"] { width: 100%; accent-color: var(--gold); cursor: pointer; }
+.macro-hint { margin: 0; font-size: 0.68rem; color: var(--text-mute); }
 .selected-scenario .h2 { font-size: 1.25rem; }
 .selected-scenario .sub { margin: 0; }
 

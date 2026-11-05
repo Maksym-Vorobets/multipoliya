@@ -25,7 +25,9 @@
     names: ["", "", "", ""],
     bots: [...DEFAULT_BOTS],
     draw: null,
+    macro: null, // { inflationRate, creditRate } chosen on the setup screen; null → admin defaults
   };
+  const macro = () => ui.macro || window.MPConfig.macroDefaults();
 
   /* ---------- helpers ---------- */
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -108,10 +110,15 @@
     }).join("");
   };
 
+  const renderMacro = () => $$("[data-macro]").forEach((el) => {
+    el.value = macro()[el.dataset.macro];
+    $(`[data-macro-val="${el.dataset.macro}"]`).textContent = `${(+el.value).toLocaleString("ru-RU")}%`;
+  });
   const renderSetup = () => {
     $$(".tab[data-mode]").forEach((b) => b.classList.toggle("is-active", b.dataset.mode === ui.mode));
     renderScenarios();
     renderPlayers();
+    renderMacro();
   };
 
   /* ---------- draw (turn order) ---------- */
@@ -205,7 +212,7 @@
       isBot: idx >= ui.real,
       botType: idx >= ui.real ? ui.bots[idx] : null,
     }));
-    attach(Match.create({ scenario: s.id, currencies: s.currencies, players }));
+    attach(Match.create({ scenario: s.id, currencies: s.currencies, players, macro: macro() }));
     go("game");
   };
 
@@ -278,7 +285,7 @@
     }
     if (el.id === "btn-to-draw" && ui.mode === "online") {
       if (!ui.names[0].trim()) return toast(t("setup.nameRequired"), "error");
-      return window.MPNet.createRoom({ scenario: ui.scenario, total: ui.total, real: ui.real, bots: ui.bots, hostName: ui.names[0].trim() }).catch((err) => toast(err.message, "error"));
+      return window.MPNet.createRoom({ scenario: ui.scenario, total: ui.total, real: ui.real, bots: ui.bots, hostName: ui.names[0].trim(), ...macro() }).catch((err) => toast(err.message, "error"));
     }
     if (el.id === "btn-to-draw") {
       const missing = ui.names.slice(0, ui.real).some((n) => !n.trim());
@@ -297,6 +304,10 @@
 
   document.addEventListener("input", (e) => {
     if (e.target.dataset.name != null) ui.names[+e.target.dataset.name] = e.target.value;
+    if (e.target.dataset.macro) {
+      ui.macro = { ...macro(), [e.target.dataset.macro]: +e.target.value };
+      renderMacro();
+    }
   });
   document.addEventListener("change", (e) => {
     if (e.target.dataset.bot != null) ui.bots[+e.target.dataset.bot] = e.target.value;
@@ -334,7 +345,7 @@
     const s = SCENARIOS.find((x) => x.id === room.scenario);
     const order = [...room.seats].map((st) => ({ st, roll: Math.random() })).sort((a, b) => b.roll - a.roll).map((x) => x.st);
     const players = order.map((st) => ({ idx: st.idx, name: st.name || t(`color.${st.color}`), color: st.color, isBot: st.isBot, botType: st.botType }));
-    const m = Match.create({ scenario: s.id, currencies: s.currencies, players });
+    const m = Match.create({ scenario: s.id, currencies: s.currencies, players, macro: room.macro || macro() });
     Match.clear();
     return JSON.parse(JSON.stringify(m));
   };

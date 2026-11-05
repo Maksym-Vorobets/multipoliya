@@ -54,7 +54,12 @@
     "h.accepted": ["принято", "прийнято", "accepted"], "h.rejected": ["не принято", "не прийнято", "rejected"],
     "h.mortgage": ["Залог {cell}:", "Застава {cell}:", "Mortgaged {cell}:"], "h.unmortgage": ["Выкуп из залога {cell}:", "Викуп із застави {cell}:", "Redeemed {cell}:"],
     "h.sell": ["Продажа банку {cell}:", "Продаж банку {cell}:", "Sold to bank {cell}:"], "h.loan": ["Кредит:", "Кредит:", "Loan:"],
-    "h.loanRepay": ["Погашение кредита:", "Погашення кредиту:", "Loan repaid:"], "h.loanPay": ["Платёж по кредиту:", "Платіж за кредитом:", "Loan payment:"],
+    "h.loanRepay": ["Погашение кредита:", "Погашення кредиту:", "Loan repaid:"],
+    "h.loanInterest": ["Проценты по кредиту:", "Відсотки за кредитом:", "Loan interest:"], "h.sellBuilding": ["Продажа постройки банку за полцены ({cell}):", "Продаж забудови банку за півціни ({cell}):", "Building sold to the bank at half price ({cell}):"],
+    "g.interestTitle": ["Проценты по кредиту", "Відсотки за кредитом", "Loan interest"],
+    "g.interestSub": ["Каждые 10 раундов: {rate}% от суммы кредита. Наличных не хватает — выберите, как покрыть платёж.", "Кожні 10 раундів: {rate}% від суми кредиту. Готівки бракує — оберіть, як покрити платіж.", "Every 10 rounds: {rate}% of the loan. Not enough cash — choose how to cover the payment."],
+    "g.sellModule": ["Продать модуль", "Продати модуль", "Sell module"], "g.sellDome": ["Продать купол", "Продати купол", "Sell dome"],
+    "g.declareBankrupt": ["Не покрывать — банкротство (пособие)", "Не покривати — банкрутство (допомога)", "Don't cover — bankruptcy (benefit)"], "h.loanPay": ["Платёж по кредиту:", "Платіж за кредитом:", "Loan payment:"],
     "h.tax": ["Обязательный платёж {cell}:", "Обов'язковий платіж {cell}:", "Mandatory payment {cell}:"], "h.grant": ["Грант {cell}:", "Грант {cell}:", "Grant {cell}:"],
     "h.narmonyon": ["Narmonyon Centrary:", "Narmonyon Centrary:", "Narmonyon Centrary:"], "h.blackhole": ["Попадание в Black Hole", "Потрапляння в Black Hole", "Entered the Black Hole"],
     "h.bhFine": ["Штраф за выход из Black Hole:", "Штраф за вихід з Black Hole:", "Black Hole exit fine:"], "h.bhSkip": ["Пропуск хода в Black Hole", "Пропуск ходу в Black Hole", "Skipped turn in Black Hole"],
@@ -1010,8 +1015,48 @@
     window.MPApp.renderSoundBtn();
   };
 
+  // Loan interest every 10 rounds; without enough cash the player chooses: extra loan, sell a building at half price, mortgage, or bankruptcy
+  const payInterest = async (p) => {
+    if (!E.interestDue(m, p)) return;
+    (m.flags.interest = m.flags.interest || {})[p.id] = m.roundNo;
+    const fc = E.fiatCur(m);
+    const due = E.loanInterest(m, p);
+    for (let guard = 0; guard < 80; guard++) {
+      if (p.wallet.has(fc, due)) return m.debit(p, fc, due, "h.loanInterest"), m.changed();
+      const short = Math.ceil(due - p.wallet.get(fc));
+      const loan = E.loanLimit(m, p) >= short ? short : 0;
+      const builds = E.buildingCells(m, p);
+      const morts = E.mortgageable(m, p);
+      let pick;
+      if (p.isBot) pick = loan ? "loan" : builds.length ? "b:" + builds[0] : morts.length ? "m:" + morts[0] : "bankrupt";
+      else {
+        pick = await dialog({
+          title: t("g.interestTitle"), sub: t("g.interestSub", { rate: m.macro.creditRate }),
+          rows: [[t("g.toPay"), fmt(due, fc)], [t("g.missing"), fmt(short, fc)], [t("game.balance"), fmt(p.wallet.get(fc), fc)]],
+          buttons: [...(loan ? [{ label: `${t("g.takeLoan")} · ${fmt(loan, fc)}`, value: "loan", primary: true, testid: "interest-loan-btn" }] : []),
+            ...builds.map((id) => ({ label: `${t(m.cells[id].dome ? "g.sellDome" : "g.sellModule")}: ${nm(id)} · +${fmt(E.buildingRefund(m, id), fc)}`, value: "b:" + id, testid: `interest-sell-${id}-btn` })),
+            ...morts.map((id) => ({ label: `${t("g.mortgageBtn")}: ${nm(id)} · +${fmt(E.mortgageValue(m, id), fc)}`, value: "m:" + id, testid: `interest-mortgage-${id}-btn` })),
+            { label: t("g.declareBankrupt"), value: "bankrupt", testid: "interest-bankrupt-btn" }],
+          closable: false,
+        });
+      }
+      if (pick === "loan") E.takeLoan(m, p, loan);
+      else if (pick && pick.startsWith("b:")) E.sellBuilding(m, p, pick.slice(2));
+      else if (pick && pick.startsWith("m:")) E.mortgage(m, p, pick.slice(2));
+      else {
+        m.debit(p, fc, Math.min(due, p.wallet.get(fc)), "h.loanInterest");
+        p.bankruptcies = (p.bankruptcies || 0) + 1;
+        p.status = "benefit";
+        m.log({ key: "h.bankrupt", playerId: p.id, params: { name: p.name } });
+        return m.changed();
+      }
+      m.changed();
+    }
+  };
+
   const startTurnChecks = async () => {
     const p = m.current;
+    if (m.phase === "await_roll") await payInterest(p);
     if (!p.restrictions.blackhole || m.phase !== "await_roll") return true;
     const nar = m.scenario === "nar_nar";
     const opt = nar ? { cur: "nar", amount: E.SP.blackHoleFineNar } : { cur: E.fiatCur(m), amount: m.bank.fiat(E.SP.blackHoleFine) };

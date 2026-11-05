@@ -222,6 +222,12 @@
 .adm-nums label, .adm-fields--in label { display: grid; gap: 4px; align-content: end; font-size: 0.68rem; color: var(--text-mute); font-weight: 800; }
 .adm-nums input, .adm-nums select, .adm-fields--in input { width: 100%; height: 36px; padding: 0 8px; border-radius: var(--radius-s); background: var(--surface); border: 1px solid var(--line-cool); font-size: 0.85rem; color: var(--text); }
 .adm-nums input:focus, .adm-nums select:focus, .adm-fields--in input:focus { outline: none; border-color: var(--gold-soft); }
+.adm-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.adm-box { display: grid; gap: 10px; align-content: start; padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: rgba(14, 30, 50, 0.6); }
+.adm-box h3 { margin: 0; font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); }
+.adm-inline { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+.adm-inline input { height: 38px; padding: 0 10px; border-radius: var(--radius-s); background: var(--surface); border: 1px solid var(--line-cool); color: var(--text); font-size: 0.85rem; min-width: 0; }
+.adm-box.macro .macro-row { grid-template-columns: 190px 1fr 44px; }
 .adm-preview { margin: 0; font-size: 0.78rem; color: var(--text-dim); line-height: 1.4; }
 .adm-preview b { color: var(--gold); }
 @media (max-width: 900px) {
