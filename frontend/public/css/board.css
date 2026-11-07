@@ -56,8 +56,9 @@
 .tokens { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
 .token {
   position: absolute; left: 0; top: 0; width: clamp(16px, 2.2vw, 36px); filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.6));
-  transition: transform 220ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  transition: transform 220ms cubic-bezier(0.34, 1.4, 0.64, 1), opacity 200ms ease, filter 200ms ease;
 }
+.token.is-warp { opacity: 0; filter: blur(4px) brightness(2.2) drop-shadow(0 0 12px rgba(140, 200, 255, 0.9)); }
 .token.is-active { filter: drop-shadow(0 0 8px rgba(255, 212, 109, 0.85)) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.6)); }
 
 /* Dialog content */

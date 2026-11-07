@@ -5,6 +5,11 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Shared animation timings
+  const DICE_MS = 1150; // 3D dice tumble
+  const STEP_MS = 230; // token step along a route
+  const HOLD_MS = 500; // pause to read a result before the next action
+  const WARP_MS = 220; // teleport fade out / in
   const lang = () => window.I18N.lang;
   const CUR_SIGN = { usd: "$", rub: "₽", nar: "g" };
   const fmt = (n, cur) => `${cur === "nar" ? (+n).toFixed(2).replace(".", ",") : Math.round(n).toLocaleString("ru-RU")} ${CUR_SIGN[cur]}`;
@@ -340,8 +345,25 @@
       const { x, y } = tokenXY(p, id);
       if (tk) tk.style.transform = `translate(${x}px, ${y}px) translate(-50%, -80%)`;
       window.MPSound.play("step");
-      await wait(230);
+      await wait(STEP_MS);
     }
+    animating.delete(p.id);
+  };
+  // Direct teleport: fade out, jump without passing intermediate cells, fade in
+  const teleportToken = async (p, id) => {
+    const tk = $(`[data-token="${p.id}"]`);
+    window.MPSound.play("teleport");
+    if (!tk) return;
+    animating.add(p.id);
+    tk.classList.add("is-warp");
+    await wait(WARP_MS);
+    const { x, y } = tokenXY(p, id);
+    tk.style.transition = "none";
+    tk.style.transform = `translate(${x}px, ${y}px) translate(-50%, -80%)`;
+    void tk.offsetWidth;
+    tk.style.transition = "";
+    tk.classList.remove("is-warp");
+    await wait(WARP_MS);
     animating.delete(p.id);
   };
 
@@ -394,7 +416,7 @@
     const b = 1 + Math.floor(Math.random() * 6);
     diceKey = `${m.id}:${m.turnNo}:${a}:${b}`;
     showDice(a, b, true);
-    await wait(1150);
+    await wait(DICE_MS);
     return [a, b];
   };
 
@@ -852,9 +874,13 @@
   /* ----- special flows ----- */
   const handleFlow = async (flow, p) => {
     if (flow === "anomaly") {
+      // modal → it closes → dice animation → pause on the result
       const rollDice = async (sub, testid) => {
         if (!p.isBot) await dialog({ title: nm("c30"), sub, buttons: [{ label: t("game.roll"), value: true, primary: true, testid }], closable: false });
-        return [1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)];
+        const r = await rollAnim();
+        if (m.lastRoll) diceKey = `${m.id}:${m.turnNo}:${m.lastRoll.a}:${m.lastRoll.b}`; // keep showing the anomaly dice
+        await wait(HOLD_MS);
+        return r;
       };
       const [a, b] = await rollDice(t("g.anomaly"), "anomaly-roll-btn");
       m.log({ key: "h.anomaly", playerId: p.id, params: { a, b, sum: a + b } });
@@ -864,7 +890,8 @@
         m.log({ key: "h.anomalyExtra", playerId: p.id, params: { a: x, b: y, sum: x + y } });
         res = B.resolveAnomalyTeleport(2, x + y);
       }
-      // instant teleport (like the Black Hole): no step animation, no salary for passing Istok
+      // direct teleport (no steps, no salary for passing Istok), then the target cell's card
+      await teleportToken(p, res.cellId);
       const r = m.move(res.cellId, { teleport: true });
       return handleFlow(r.flow, p);
     }

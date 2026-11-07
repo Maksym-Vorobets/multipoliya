@@ -46,6 +46,11 @@
       [523, 415, 330, 262].forEach((f, i) => tone(f, 0.28, { type: "sawtooth", vol: 0.05, at: i * 0.18, to: f * 0.94 }));
       noise(0.5, { vol: 0.12, at: 0.72, freq: 300, q: 0.8 });
     },
+    teleport: () => {
+      tone(220, 0.42, { type: "sine", vol: 0.09, to: 1760 });
+      tone(330, 0.36, { type: "triangle", vol: 0.04, at: 0.06, to: 2200 });
+      noise(0.35, { vol: 0.08, freq: 3200, q: 0.9 });
+    },
     dice: () => {
       // shake + a few bounces that decay
       for (let i = 0; i < 6; i++) noise(0.04, { vol: 0.18, at: i * 0.05, freq: 2400 + Math.random() * 1500, q: 3 });
