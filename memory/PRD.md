@@ -89,3 +89,4 @@ Build the browser PWA game «Мультиполия» from the spec (Техни�
 - Setup screen: inflation & credit sliders inside «Выбранный сценарий» (init from config defaults) → match.macro; online rooms carry macro (RoomCreate inflationRate/creditRate).
 - Engine: calculateFiatPrice(base, round, rate) = round(base × (1+rate/100)^floor(round/10)); gold price = 100 × same factor; Narmonit = fiat / gold.
 - Loans: no +5% markup, no 3% installments; every 10th round at the player's turn start interest = principal × creditRate% (flags.interest). Not enough cash → dialog: extra loan / sell module or dome at half price / mortgage / bankruptcy (benefit status). Bots auto-pick in that order.
+- Anomaly of Probability (c30): B.resolveAnomalyTeleport(diceSum, extraSum) hard-coded map (3/7/8/12/13/18 steps, inner/outer), sum 2 → player presses «Бросить» for a check roll (even → 33-1 Chance, odd → 33-2 Borgi). Instant teleport via m.move(teleport) — no step animation, no salary.

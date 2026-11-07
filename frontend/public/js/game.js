@@ -28,7 +28,8 @@
     "g.voter": ["Голосует", "Голосує", "Voter"], "g.bidder": ["Участник", "Учасник", "Bidder"], "g.initiator": ["Инициатор", "Ініціатор", "Initiator"], "g.source": ["Источник средств", "Джерело коштів", "Source of funds"],
     "g.bank": ["Банк", "Банк", "Bank"], "g.joint": ["Совместная покупка", "Спільна купівля", "Joint purchase"], "g.partners": ["Выберите участников", "Оберіть учасників", "Choose partners"],
     "g.confirm": ["Подтвердить", "Підтвердити", "Confirm"], "g.join": ["Участвовать", "Брати участь", "Join"], "g.part": ["Ваша часть", "Ваша частина", "Your part"],
-    "g.anomaly": ["Аномалия вероятности: чётная сумма — к ближайшей Chance, нечётная — к Borgi", "Аномалія ймовірності: парна сума — до найближчої Chance, непарна — до Borgi", "Anomaly: even sum — nearest Chance, odd — nearest Borgi"],
+    "g.anomaly": ["Аномалия вероятности: сумма кубиков определяет клетку Шанс или Борги, куда вас мгновенно перенесёт (чётная — Шанс, нечётная — Борги)", "Аномалія ймовірності: сума кубиків визначає клітинку Шанс або Борги, куди вас миттєво перенесе (парна — Шанс, непарна — Борги)", "Anomaly of Probability: the dice sum picks the Chance or Borgi cell you are teleported to (even — Chance, odd — Borgi)"],
+    "g.anomalyExtra": ["Дубль 1:1 — проверочный бросок: чётная сумма — Шанс, нечётная — Борги", "Дубль 1:1 — перевірочний кидок: парна сума — Шанс, непарна — Борги", "Double 1:1 — check roll: even sum — Chance, odd — Borgi"],
     "g.card": ["Карточки Chance и Borgi подключаются на шаге 5", "Картки Chance і Borgi підключаються на кроці 5", "Chance and Borgi cards arrive in step 5"],
     "g.bh": ["Вы в Black Hole. Заплатите штраф, чтобы ходить, или пропустите ход.", "Ви в Black Hole. Сплатіть штраф, щоб ходити, або пропустіть хід.", "You are in the Black Hole. Pay a fine to move or skip the turn."],
     "g.payFine": ["Заплатить штраф", "Сплатити штраф", "Pay fine"], "g.skip": ["Пропустить ход", "Пропустити хід", "Skip turn"],
@@ -79,6 +80,7 @@
     "r.title": ["Итоги партии", "Підсумки партії", "Match results"], "menu.home": ["Главный экран", "Головний екран", "Main screen"],
     "game.plays": ["Ходит", "Ходить", "Playing"],
     "h.anomaly": ["Аномалия: {a} + {b} = {sum}", "Аномалія: {a} + {b} = {sum}", "Anomaly: {a} + {b} = {sum}"],
+    "h.anomalyExtra": ["Аномалия, проверочный бросок: {a} + {b} = {sum}", "Аномалія, перевірочний кидок: {a} + {b} = {sum}", "Anomaly check roll: {a} + {b} = {sum}"],
     "g.rentChoose": ["Выберите вид аренды", "Оберіть вид оренди", "Choose the rent type"], "g.rentSum": ["Сумма аренды", "Сума оренди", "Rent amount"],
     "g.pay.usd": ["Оплатить в долларах", "Сплатити в доларах", "Pay in dollars"], "g.pay.nar": ["Оплатить в нармоните", "Сплатити в нармоніті", "Pay in Narmonit"], "g.pay.rub": ["Оплатить в рублях", "Сплатити в рублях", "Pay in roubles"],
     "g.otherActs": ["Другие действия", "Інші дії", "Other actions"], "g.weight": ["Доля голоса", "Частка голосу", "Vote weight"],
@@ -850,13 +852,20 @@
   /* ----- special flows ----- */
   const handleFlow = async (flow, p) => {
     if (flow === "anomaly") {
-      if (!p.isBot) await dialog({ title: nm("c30"), sub: t("g.anomaly"), buttons: [{ label: t("game.roll"), value: true, primary: true, testid: "anomaly-roll-btn" }], closable: false });
-      const a = 1 + Math.floor(Math.random() * 6), b = 1 + Math.floor(Math.random() * 6);
+      const rollDice = async (sub, testid) => {
+        if (!p.isBot) await dialog({ title: nm("c30"), sub, buttons: [{ label: t("game.roll"), value: true, primary: true, testid }], closable: false });
+        return [1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)];
+      };
+      const [a, b] = await rollDice(t("g.anomaly"), "anomaly-roll-btn");
       m.log({ key: "h.anomaly", playerId: p.id, params: { a, b, sum: a + b } });
-      const kind = (a + b) % 2 === 0 ? "chance" : "borgi";
-      const path = B.forwardTo(p.cell, p.ring, (c) => c.kind === kind);
-      await animatePath(p, path);
-      const r = m.move(path[path.length - 1], { teleport: true });
+      let res = B.resolveAnomalyTeleport(a + b);
+      if (res.needsExtra) {
+        const [x, y] = await rollDice(t("g.anomalyExtra"), "anomaly-extra-roll-btn");
+        m.log({ key: "h.anomalyExtra", playerId: p.id, params: { a: x, b: y, sum: x + y } });
+        res = B.resolveAnomalyTeleport(2, x + y);
+      }
+      // instant teleport (like the Black Hole): no step animation, no salary for passing Istok
+      const r = m.move(res.cellId, { teleport: true });
       return handleFlow(r.flow, p);
     }
     if (flow === "card") return cardFlow(p, B.cells[p.cell].kind);

@@ -151,5 +151,15 @@
   };
   const rentTable = (c) => ({ base: c.rent[0], double: c.rent[0] * 2, modules: c.rent.slice(0, 5), dome: c.rent[5] });
 
-  window.MPBoard = { cells, groupOf, order, GROUPS, CORNERS, next, reachable, forwardTo, groupCells, setCells, name, label, art, rentTable, STATIONS, applyFields };
+  // Anomaly of Probability (pos 30): dice sum → [steps (+ clockwise / − counter-clockwise), ring (1 inner, 2 outer)]
+  const ANOMALY = { 3: [-7, 1], 4: [-7, 2], 5: [8, 1], 6: [8, 2], 7: [12, 2], 8: [12, 1], 9: [-13, 2], 10: [-13, 1], 11: [-18, 1], 12: [-18, 2] };
+  // Sum 2 (double 1:1) needs an extra roll: even → Chance 3 steps inner, odd → Borgi 3 steps outer
+  const resolveAnomalyTeleport = (diceSum, extraSum) => {
+    if (diceSum === 2 && extraSum == null) return { needsExtra: true };
+    const [steps, ring] = diceSum === 2 ? (extraSum % 2 === 0 ? [3, 1] : [3, 2]) : ANOMALY[diceSum];
+    const cellId = `${(30 + steps + 40) % 40}-${ring}`;
+    return { cellId, kind: cells[cellId].kind };
+  };
+
+  window.MPBoard = { cells, groupOf, order, GROUPS, CORNERS, next, reachable, forwardTo, groupCells, setCells, name, label, art, rentTable, STATIONS, applyFields, resolveAnomalyTeleport };
 })();
