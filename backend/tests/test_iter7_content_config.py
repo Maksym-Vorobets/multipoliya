@@ -23,7 +23,7 @@ def original():
     d = r.json()
     if not d.get("fields"):
         pytest.skip("no stored config to use as base")
-    return {k: d[k] for k in ("inflationRate", "fields", "cards")}
+    return {k: d[k] for k in ("defaultInflationRate", "defaultCreditRate", "fields", "cards") if k in d}
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -85,9 +85,9 @@ class TestContentConfig:
         r = requests.put(f"{BASE_URL}/api/admin/content-config", json=bad, headers=H(token))
         assert r.status_code == 422
 
-    def test_put_inflation_over_100_422(self, token, original):
+    def test_put_inflation_over_10_422(self, token, original):
         bad = copy.deepcopy(original)
-        bad["inflationRate"] = 150
+        bad["defaultInflationRate"] = 150
         r = requests.put(f"{BASE_URL}/api/admin/content-config", json=bad, headers=H(token))
         assert r.status_code == 422
 
