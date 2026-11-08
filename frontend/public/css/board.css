@@ -224,6 +224,17 @@
 .adm-nums input, .adm-nums select, .adm-fields--in input { width: 100%; height: 36px; padding: 0 8px; border-radius: var(--radius-s); background: var(--surface); border: 1px solid var(--line-cool); font-size: 0.85rem; color: var(--text); }
 .adm-nums input:focus, .adm-nums select:focus, .adm-fields--in input:focus { outline: none; border-color: var(--gold-soft); }
 .adm-sep { margin: 18px 0 6px; font-size: 0.9rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); }
+.adm-acc { margin-bottom: 8px; }
+.adm-acc > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: rgba(14, 30, 50, 0.6); transition: border-color 160ms ease; }
+.adm-acc > summary::-webkit-details-marker { display: none; }
+.adm-acc > summary::before { content: "›"; display: inline-block; transition: transform 160ms ease; }
+.adm-acc[open] > summary::before { transform: rotate(90deg); }
+.adm-acc > summary:hover { border-color: var(--gold-soft); }
+.adm-acc > summary small { color: var(--text-mute); font-weight: 600; }
+.adm-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 12px; }
+.adm-page.is-active { border-color: var(--gold); color: var(--gold); }
+.adm-page[disabled] { opacity: 0.4; pointer-events: none; }
+.adm-page-gap { color: var(--text-mute); padding: 0 4px; }
 .adm-modal { margin-bottom: 12px; padding: 10px 14px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: rgba(14, 30, 50, 0.45); }
 .adm-modal h3 { margin: 4px 0 8px; font-size: 0.85rem; color: var(--text); }
 .adm-modal h3 small { margin-left: 6px; font-size: 0.66rem; color: var(--text-mute); font-weight: 600; }

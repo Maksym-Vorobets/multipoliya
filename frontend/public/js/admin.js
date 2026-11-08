@@ -16,7 +16,8 @@
     "adm.reset": ["Сбросить к исходному", "Скинути до початкового", "Reset to default"], "adm.back": ["На главный экран", "На головний екран", "Main screen"],
     "adm.html": ["Поддерживается HTML: <h4>, <p>, <b>", "Підтримується HTML: <h4>, <p>, <b>", "HTML supported: <h4>, <p>, <b>"],
     "adm.content": ["Редактор контента", "Редактор контенту", "Content editor"],
-    "adm.modals": ["Системные и игровые окна", "Системні та ігрові вікна", "System and game windows"],
+    "adm.modals": ["Тексты системных окон", "Тексти системних вікон", "System window texts"],
+    "adm.prev": ["‹ Назад", "‹ Назад", "‹ Back"], "adm.next": ["Вперёд ›", "Вперед ›", "Next ›"], "adm.page": ["Страница {n} из {total}", "Сторінка {n} з {total}", "Page {n} of {total}"],
     "adm.modalsHint": ["Плейсхолдеры в фигурных скобках ({sum}, {cell}, {name}, {rate}…) подставляются игрой — оставьте их в тексте.", "Плейсхолдери у фігурних дужках ({sum}, {cell}, {name}, {rate}…) підставляє гра — залиште їх у тексті.", "Placeholders in braces ({sum}, {cell}, {name}, {rate}…) are filled by the game — keep them in the text."],
     "adm.otherUi": ["Остальные элементы интерфейса", "Інші елементи інтерфейсу", "Other interface elements"],
     "adm.presets": ["Пресеты", "Пресети", "Presets"], "adm.noPresets": ["Нет сохранённых пресетов", "Немає збережених пресетів", "No saved presets"],
@@ -57,6 +58,9 @@
   let tab = "rules";
   let deck = "fields";
   let query = "";
+  let currentPage = 1;
+  const itemsPerPage = 60;
+  let modalsOpen = false; // «Тексты системных окон» accordion, collapsed by default
   let cc = null; // game_content_config draft
   let presets = null; // [{ id, presetName, createdAt }]
   let presetName = "";
@@ -142,6 +146,17 @@
     </div>`;
   };
 
+  // Page numbers with ellipsis: 1 … 4 5 6 … 8
+  const pager = (pages, where) => {
+    if (pages < 2) return "";
+    const nums = [...new Set([1, currentPage - 1, currentPage, currentPage + 1, pages])].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+    const items = nums.flatMap((n, i) => (i && n - nums[i - 1] > 1 ? ["…", n] : [n]));
+    const btn = (label, page, attrs = "") => `<button class="btn btn--sm adm-page${page === currentPage && /^\d+$/.test(label) ? " is-active" : ""}" data-page="${page}" data-where="${where}" ${attrs}>${label}</button>`;
+    return `<nav class="adm-pager" data-testid="adm-pager-${where}">${btn(esc(t("adm.prev")), currentPage - 1, `${currentPage === 1 ? "disabled" : ""} data-testid="adm-pager-${where}-prev"`)}` +
+      items.map((n) => (n === "…" ? `<span class="adm-page-gap">…</span>` : btn(String(n), n, `data-testid="adm-pager-${where}-${n}"`))).join("") +
+      `${btn(esc(t("adm.next")), currentPage + 1, `${currentPage === pages ? "disabled" : ""} data-testid="adm-pager-${where}-next"`)}</nav>`;
+  };
+
   const render = () => {
     const logged = !!token;
     $("#admin-login").hidden = logged;
@@ -163,15 +178,20 @@
       const match = (k) => !q || k.toLowerCase().includes(q) || Object.values(labels[k] || {}).some((v) => v.toLowerCase().includes(q)) || JSON.stringify(smt[k]).toLowerCase().includes(q);
       const modals = Object.keys(smt).filter(match).map((k) => `<div class="adm-modal" data-testid="adm-modal-${k}"><h3>${esc((labels[k] || {})[I.lang] || k)} <small>${esc(k)}</small></h3>` +
         Object.keys(smt[k].RU).map((f) => row(f, LANGS.map(([l, L]) => field(L, smt[k][ML[l]][f], `data-mt="${k}" data-mf="${f}" data-ml="${ML[l]}" data-testid="adm-modal-${k}-${f}-${l}"`)))).join("") + "</div>").join("");
-      const modalsHtml = `<h3 class="adm-sep" data-testid="adm-modals-title">${esc(t("adm.modals"))}</h3><p class="sub sub--xs">${esc(t("adm.modalsHint"))}</p>${modals}<h3 class="adm-sep" data-testid="adm-other-ui-title">${esc(t("adm.otherUi"))}</h3>`;
+      const nModals = Object.keys(smt).filter(match).length;
+      const modalsHtml = `<details class="adm-acc" id="adm-modals-acc" ${modalsOpen ? "open" : ""} data-testid="adm-modals-accordion"><summary class="adm-sep" data-testid="adm-modals-title">${esc(t("adm.modals"))} <small>(${nModals})</small></summary><p class="sub sub--xs">${esc(t("adm.modalsHint"))}</p>${modals}</details><h3 class="adm-sep" data-testid="adm-other-ui-title">${esc(t("adm.otherUi"))}</h3>`;
       const keys = I.keys().filter((k) => !k.startsWith("rules.") && !k.startsWith("policy.") && (!q || k.toLowerCase().includes(q) || LANGS.some(([l]) => String(textVal(l, k)).toLowerCase().includes(q))));
-      html = modalsHtml + `<p class="sub sub--xs">${t("adm.shown", { n: Math.min(60, keys.length), total: keys.length })}</p>` +
-        keys.slice(0, 60).map((k) => row(k, LANGS.map(([l, L]) => field(L, textVal(l, k), `data-text="${k}" data-lang="${l}" data-testid="adm-text-${k}-${l}"`)))).join("");
+      const pages = Math.max(1, Math.ceil(keys.length / itemsPerPage));
+      currentPage = Math.min(Math.max(1, currentPage), pages);
+      const pageKeys = keys.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+      html = modalsHtml + `<p class="sub sub--xs" data-testid="adm-shown">${t("adm.shown", { n: pageKeys.length, total: keys.length })} · ${t("adm.page", { n: currentPage, total: pages })}</p>` + pager(pages, "top") +
+        pageKeys.map((k) => row(k, LANGS.map(([l, L]) => field(L, textVal(l, k), `data-text="${k}" data-lang="${l}" data-testid="adm-text-${k}-${l}"`)))).join("") + pager(pages, "bottom");
     }
     if (tab === "content") html = topBlock() + (deck === "fields" ? fieldsEditor() : cardsEditor());
     $("#admin-list").innerHTML = html;
   };
 
+  document.addEventListener("toggle", (e) => e.target.id === "adm-modals-acc" && (modalsOpen = e.target.open), true);
   document.addEventListener("input", (e) => {
     const el = e.target;
     if (el.dataset.mt) {
@@ -191,6 +211,8 @@
       }
     } else if (el.id === "admin-search") {
       query = el.value;
+      currentPage = 1;
+      if (query.trim()) modalsOpen = true;
       render();
       $("#admin-search").focus();
     }
@@ -222,6 +244,12 @@
       token = null;
       sessionStorage.removeItem("mp.admin");
       render();
+    }
+    if (b.dataset.page) {
+      currentPage = +b.dataset.page;
+      render();
+      if (b.dataset.where === "bottom") $("#admin-list").scrollIntoView({ block: "start" });
+      return;
     }
     if (b.id === "adm-preset-default") {
       cc = window.MPConfig.defaults();
