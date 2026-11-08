@@ -23,7 +23,7 @@ def original():
     d = r.json()
     if not d.get("fields"):
         pytest.skip("no stored config to use as base")
-    return {k: d[k] for k in ("defaultInflationRate", "defaultCreditRate", "fields", "cards") if k in d}
+    return {k: d[k] for k in ("defaultInflationRate", "defaultCreditRate", "fields", "cards", "systemModalsText") if k in d}
 
 
 @pytest.fixture(scope="module", autouse=True)
