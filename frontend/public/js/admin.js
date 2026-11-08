@@ -16,6 +16,9 @@
     "adm.reset": ["Сбросить к исходному", "Скинути до початкового", "Reset to default"], "adm.back": ["На главный экран", "На головний екран", "Main screen"],
     "adm.html": ["Поддерживается HTML: <h4>, <p>, <b>", "Підтримується HTML: <h4>, <p>, <b>", "HTML supported: <h4>, <p>, <b>"],
     "adm.content": ["Редактор контента", "Редактор контенту", "Content editor"],
+    "adm.modals": ["Системные и игровые окна", "Системні та ігрові вікна", "System and game windows"],
+    "adm.modalsHint": ["Плейсхолдеры в фигурных скобках ({sum}, {cell}, {name}, {rate}…) подставляются игрой — оставьте их в тексте.", "Плейсхолдери у фігурних дужках ({sum}, {cell}, {name}, {rate}…) підставляє гра — залиште їх у тексті.", "Placeholders in braces ({sum}, {cell}, {name}, {rate}…) are filled by the game — keep them in the text."],
+    "adm.otherUi": ["Остальные элементы интерфейса", "Інші елементи інтерфейсу", "Other interface elements"],
     "adm.presets": ["Пресеты", "Пресети", "Presets"], "adm.noPresets": ["Нет сохранённых пресетов", "Немає збережених пресетів", "No saved presets"],
     "adm.load": ["Загрузить", "Завантажити", "Load"], "adm.presetName": ["Название пресета", "Назва пресету", "Preset name"],
     "adm.saveAsPreset": ["Сохранить как новый пресет", "Зберегти як новий пресет", "Save as new preset"], "adm.toDefault": ["Вернуть по умолчанию", "Повернути за замовчуванням", "Restore defaults"],
@@ -154,8 +157,15 @@
     }
     if (tab === "ui") {
       const q = query.toLowerCase();
+      const ML = { ru: "RU", en: "EN", uk: "UA" };
+      const smt = draft().systemModalsText;
+      const labels = window.MP_MODAL_LABELS || {};
+      const match = (k) => !q || k.toLowerCase().includes(q) || Object.values(labels[k] || {}).some((v) => v.toLowerCase().includes(q)) || JSON.stringify(smt[k]).toLowerCase().includes(q);
+      const modals = Object.keys(smt).filter(match).map((k) => `<div class="adm-modal" data-testid="adm-modal-${k}"><h3>${esc((labels[k] || {})[I.lang] || k)} <small>${esc(k)}</small></h3>` +
+        Object.keys(smt[k].RU).map((f) => row(f, LANGS.map(([l, L]) => field(L, smt[k][ML[l]][f], `data-mt="${k}" data-mf="${f}" data-ml="${ML[l]}" data-testid="adm-modal-${k}-${f}-${l}"`)))).join("") + "</div>").join("");
+      const modalsHtml = `<h3 class="adm-sep" data-testid="adm-modals-title">${esc(t("adm.modals"))}</h3><p class="sub sub--xs">${esc(t("adm.modalsHint"))}</p>${modals}<h3 class="adm-sep" data-testid="adm-other-ui-title">${esc(t("adm.otherUi"))}</h3>`;
       const keys = I.keys().filter((k) => !k.startsWith("rules.") && !k.startsWith("policy.") && (!q || k.toLowerCase().includes(q) || LANGS.some(([l]) => String(textVal(l, k)).toLowerCase().includes(q))));
-      html = `<p class="sub sub--xs">${t("adm.shown", { n: Math.min(60, keys.length), total: keys.length })}</p>` +
+      html = modalsHtml + `<p class="sub sub--xs">${t("adm.shown", { n: Math.min(60, keys.length), total: keys.length })}</p>` +
         keys.slice(0, 60).map((k) => row(k, LANGS.map(([l, L]) => field(L, textVal(l, k), `data-text="${k}" data-lang="${l}" data-testid="adm-text-${k}-${l}"`)))).join("");
     }
     if (tab === "content") html = topBlock() + (deck === "fields" ? fieldsEditor() : cardsEditor());
@@ -164,7 +174,9 @@
 
   document.addEventListener("input", (e) => {
     const el = e.target;
-    if (el.dataset.cfgrate) {
+    if (el.dataset.mt) {
+      draft().systemModalsText[el.dataset.mt][el.dataset.ml][el.dataset.mf] = el.value;
+    } else if (el.dataset.cfgrate) {
       draft()[el.dataset.cfgrate] = +el.value;
       document.querySelector(`[data-cfgrate-val="${el.dataset.cfgrate}"]`).textContent = `${el.value}%`;
     } else if (el.id === "adm-preset-name") presetName = el.value;
@@ -236,6 +248,7 @@
     if (b.id === "admin-reset-btn") {
       if (tab === "content") return ((cc = window.MPConfig.defaults()), render());
       content = { texts: {} };
+      if (tab === "ui") draft().systemModalsText = window.MPConfig.defaults().systemModalsText;
       I.keys().forEach((k) => LANGS.forEach(([l]) => I.override({ [l]: { [k]: I.original(l, k) } })));
       render();
     }
@@ -248,6 +261,11 @@
         } else {
           await req("PUT", "/admin/content", content);
           applyContent();
+          if (cc) {
+            await req("PUT", "/admin/content-config", cc);
+            window.MPConfig.apply(cc);
+            cc = null;
+          }
         }
         window.MPApp.toast(t("adm.saved"));
       } catch (err) {

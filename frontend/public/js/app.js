@@ -84,7 +84,7 @@
       </button>`).join("");
     const s = scn();
     $("#sel-scn-name").textContent = t(`scn.${s.id}.name`);
-    $("#sel-scn-desc").textContent = `${t(`scn.${s.id}.short`)} · ${t("setup.currency")}: ${s.currencies.map((c) => t(`cur.${c}`).toLowerCase()).join(", ")}`;
+    $("#sel-scn-desc").textContent = `${t(`scn.${s.id}.short`)} · ${t("tpl.currency", { list: s.currencies.map((c) => t(`cur.${c}`).toLowerCase()).join(", ") })}`;
   };
 
   const renderPlayers = () => {
@@ -227,19 +227,19 @@
     const m = ui.match;
     if (!m) return go("start");
     const cur = m.current;
-    $("#turn-no").textContent = m.roundNo; // a turn = every player has rolled once; doubles stay in the same turn
+    $("#turn-label").innerHTML = esc(t("tpl.turn", { n: "\u0001" })).replace("\u0001", `<b id="turn-no" data-testid="turn-number">${m.roundNo}</b>`); // a turn = every player has rolled once; doubles stay in the same turn
     $("#gold-price").textContent = m.bank.goldPrice.toLocaleString("ru-RU");
     $("#players-list").innerHTML = m.players.map((p, i) => `
       <li class="pl-item${i === m.active ? " is-active" : ""}" data-testid="player-card-${p.color}">
         <img src="/assets/img/token-${p.color}.png" alt="" />
         <div><div class="pl-name">${esc(p.name)}</div>
-          <div class="pl-bal" data-testid="player-balance-${p.color}">${t("game.balance")}: ${balances(p)}</div>
+          <div class="pl-bal" data-testid="player-balance-${p.color}">${t("tpl.balance", { sum: balances(p) })}</div>
           ${p.isBot ? `<div class="pl-bot">${t(`bot.${p.botType}`)}</div>` : ""}
           ${p.status === "benefit" ? `<div class="pl-status" data-testid="player-status-${p.color}">${t("game.onBenefit")}</div>` : ""}</div>
         ${i === m.active ? `<span class="pl-tag">${m.online && p.idx !== window.MPNet.session?.seat ? t("game.plays") : t("game.yourTurn")}</span>` : "<span></span>"}
       </li>`).join("");
     $("#center-title").textContent = `${cur.name} · ${window.MPBoard.name(cur.cell, window.I18N.lang)}`;
-    $("#center-balance").textContent = `${t("game.yourBalance")}: ${balances(cur, " / ")}`;
+    $("#center-balance").textContent = t("tpl.yourBalance", { sum: balances(cur, " / ") });
     const r = m.lastRoll;
     const ur = m.turnState && m.turnState.utilRoll;
     $("#roll-result").innerHTML = ur ? `${ur.a} + ${ur.b} = ${ur.sum}` : r ? `${r.a} + ${r.b} = ${r.sum}${r.double ? `<em>${t("game.double")}</em>` : ""}` : "";

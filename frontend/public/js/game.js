@@ -11,6 +11,13 @@
   const HOLD_MS = 500; // pause to read a result before the next action
   const WARP_MS = 220; // teleport fade out / in
   const lang = () => window.I18N.lang;
+  // Modal texts from game_content_config.systemModalsText[modal][RU|EN|UA][field] with {placeholders}; built-in defaults as fallback
+  const MODAL_LANG = { ru: "RU", en: "EN", uk: "UA" };
+  const mt = (modal, field, params = {}) => {
+    const pick = (src) => src && src[modal] && src[modal][MODAL_LANG[lang()]] && src[modal][MODAL_LANG[lang()]][field];
+    const s = pick(window.MPConfig.get().systemModalsText) ?? pick(window.MP_CONTENT_DEFAULT.systemModalsText) ?? field;
+    return String(s).replace(/\{(\w+)\}/g, (_, k) => (params[k] != null ? params[k] : `{${k}}`));
+  };
   const CUR_SIGN = { usd: "$", rub: "₽", nar: "g" };
   const fmt = (n, cur) => `${cur === "nar" ? (+n).toFixed(2).replace(".", ",") : Math.round(n).toLocaleString("ru-RU")} ${CUR_SIGN[cur]}`;
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -18,6 +25,8 @@
 
   // UI + history texts [ru, uk, en]
   window.I18N.extend({
+    // Small UI templates: words editable in CMS, {placeholders} filled by the game
+    "tpl.turn": ["Ход {n}","Хід {n}","Turn {n}"], "tpl.buyShare": ["Выкупить долю {pct}","Викупити частку {pct}","Buy a share {pct}"], "tpl.player": ["Игрок: {name}","Гравець: {name}","Player: {name}"], "tpl.tender": ["Тендер: {state}","Тендер: {state}","Tender: {state}"], "tpl.collect": ["Взыскать аренду: {state}","Стягнути оренду: {state}","Collect rent: {state}"], "tpl.subjBuild": ["Строительство: {kind}","Будівництво: {kind}","Construction: {kind}"], "tpl.currency": ["Валюта: {list}","Валюта: {list}","Currency: {list}"], "tpl.balance": ["Баланс: {sum}","Баланс: {sum}","Balance: {sum}"], "tpl.yourBalance": ["Ваш баланс: {sum}","Ваш баланс: {sum}","Your balance: {sum}"], "tpl.bot": ["бот · {type}","бот · {type}","bot · {type}"],
     "g.chooseSector": ["Выберите сектор", "Оберіть сектор", "Choose a sector"], "g.confirmMove": ["Подтвердить ход", "Підтвердити хід", "Confirm move"],
     "g.cellActions": ["Действия по клетке", "Дії на клітинці", "Cell actions"], "g.back": ["Вернуться к полю", "Повернутися до поля", "Back to board"],
     "g.price": ["Стоимость", "Вартість", "Price"], "g.module": ["Модуль", "Модуль", "Module"], "g.dome": ["Купол", "Купол", "Dome"],
@@ -448,7 +457,7 @@
     const html = `<div class="sector-head">${icon}<div><div class="sector-name" data-testid="sector-name">${esc(nm(id))}</div>
       <div class="sub sub--xs" data-testid="sector-status">${E.statusLabel(m, id) || t(`scn.${m.scenario}.name`)}</div></div></div>
       ${E.model(m, id) ? `<div class="sector-grid"><ul class="sector-owners">${owners}</ul><dl class="dlg-rows">${cellRows(id).map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl></div>` : ""}
-      ${myTurn(m.current) && m.phase !== "await_move" ? E.shareOffers(m, id, m.current).map((o) => `<button class="btn btn--sm sector-convert" data-g="buyshare" data-id="${id}" data-share="${o.share}" data-testid="buy-share-${Math.round(o.share * 100)}-btn">${t("g.buyShare")} ${Math.round(o.share * 100)}% · ${fmt(o.total, unitCur())}</button>`).join("") : ""}
+      ${myTurn(m.current) && m.phase !== "await_move" ? E.shareOffers(m, id, m.current).map((o) => `<button class="btn btn--sm sector-convert" data-g="buyshare" data-id="${id}" data-share="${o.share}" data-testid="buy-share-${Math.round(o.share * 100)}-btn">${t("tpl.buyShare", { pct: Math.round(o.share * 100) + "%" })} · ${fmt(o.total, unitCur())}</button>`).join("") : ""}
       ${E.canConvert(m, id) && myTurn(m.current) && m.phase !== "await_move" ? `<button class="btn btn--sm sector-convert" data-g="convert" data-id="${id}" data-testid="convert-vote-btn">${t("g.convert")}</button>` : ""}`;
     $("#sector-body").innerHTML = html;
     $("#sector-body-m").innerHTML = html.replace(/data-testid="/g, 'data-testid="m-'); // mobile: under the board
@@ -477,7 +486,7 @@
     const c = propSel && B.cells[propSel];
     const dis = (ok) => (ok ? "" : "disabled");
     const debt = p.loans.reduce((a, l) => a + l.debt, 0);
-    $("#props-panel").innerHTML = `<div class="panel-head"><span class="eyebrow eyebrow--gold">${t("g.player")}: ${esc(p.name)}</span></div>
+    $("#props-panel").innerHTML = `<div class="panel-head"><span class="eyebrow eyebrow--gold">${t("tpl.player", { name: esc(p.name) })}</span></div>
       <div class="stat-line"><span>${t("g.build")}: <b>${fmt(p.stats.build, unit)}</b></span><span>${t("g.life")}: <b>${fmt(p.stats.life, unit)}</b></span></div>
       <div class="props-scroll" data-testid="props-scroll">${ids.length ? `<table class="props-table"><thead><tr><th></th><th>${t("g.buildings")}</th><th>${t("g.share")}</th><th>${t("g.rent")}</th></tr></thead><tbody>${rows}</tbody></table>` : `<p class="sub sub--xs">${t("g.noProps")}</p>`}</div>
       ${m.scenario.startsWith("kap") ? `<div class="loan-line"><span>${t("g.debt")}: <b>${fmt(debt, fc)}</b> · ${t("g.limit")}: <b>${fmt(E.loanLimit(m, p), fc)}</b></span>
@@ -486,8 +495,8 @@
         <div class="prop-bar-name" data-testid="prop-selected-name">${propSel ? `${t("g.selected")}: <b>${esc(nm(propSel))}</b>` : t("g.selectProp")}</div>
         <button class="btn btn--sm" data-prop="mortgage" ${dis(can)} data-testid="prop-mortgage-btn">${s && s.mortgaged ? t("g.redeem") : t("g.mortgageBtn")}</button>
         <button class="btn btn--sm" data-prop="sell" ${dis(can || (narShared && myTurn(p)))} data-testid="prop-sell-btn">${narShared ? t("g.sellShare") : t("g.sellBank")}</button>
-        <button class="btn btn--sm${s && s.tender ? " is-on" : ""}" data-prop="tender" ${dis(can && c.build && !s.dome)} data-testid="prop-tender-btn">${t("g.tender")}: ${s && s.tender ? t("g.on") : t("g.off")}</button>
-        <button class="btn btn--sm${s && s.collect ? " is-on" : ""}" data-prop="collect" ${dis(can)} data-testid="prop-collect-btn">${t("g.collect")}: ${s && s.collect ? t("g.on") : t("g.off")}</button>
+        <button class="btn btn--sm${s && s.tender ? " is-on" : ""}" data-prop="tender" ${dis(can && c.build && !s.dome)} data-testid="prop-tender-btn">${t("tpl.tender", { state: s && s.tender ? t("g.on") : t("g.off") })}</button>
+        <button class="btn btn--sm${s && s.collect ? " is-on" : ""}" data-prop="collect" ${dis(can)} data-testid="prop-collect-btn">${t("tpl.collect", { state: s && s.collect ? t("g.on") : t("g.off") })}</button>
       </div>` : ""}`;
   };
 
@@ -596,10 +605,10 @@
       if (p.isBot) pick = loan ? "loan" : list[0];
       else {
         pick = await dialog({
-          title: t("g.noFunds"), sub: t("g.sellToPay"),
-          rows: [[t("g.toPay"), fmt(o.amount, o.cur)], [t("g.missing"), fmt(short, o.cur)], [t("game.balance"), m.currencies.map((c) => fmt(p.wallet.get(c), c)).join(" · ")]],
-          buttons: [...(loan ? [{ label: `${t("g.takeLoan")} · ${fmt(loan, fc)}`, value: "loan", primary: true, testid: "rent-loan-btn" }] : []),
-            ...list.map((h) => ({ label: `${t("g.sellBank")}: ${nm(h)} · +${fmt(E.holdingValue(m, h, p), unitCur())}`, value: h, testid: `sell-holding-${h}-btn` }))],
+          title: mt("rentShortage", "title"), sub: mt("rentShortage", "description"),
+          rows: [[mt("rentShortage", "rowToPay"), fmt(o.amount, o.cur)], [mt("rentShortage", "rowMissing"), fmt(short, o.cur)], [mt("rentShortage", "rowBalance"), m.currencies.map((c) => fmt(p.wallet.get(c), c)).join(" · ")]],
+          buttons: [...(loan ? [{ label: mt("rentShortage", "loanButton", { sum: fmt(loan, fc) }), value: "loan", primary: true, testid: "rent-loan-btn" }] : []),
+            ...list.map((h) => ({ label: mt("rentShortage", "sellButton", { cell: nm(h), sum: fmt(E.holdingValue(m, h, p), unitCur()) }), value: h, testid: `sell-holding-${h}-btn` }))],
           closable: false,
         });
       }
@@ -628,11 +637,11 @@
     const limit = E.loanLimit(m, p);
     const short = o ? Math.max(0, o.amount - p.wallet.get(o.cur)) : 0;
     const buttons = [];
-    if (o && o.cur === fc && limit >= short && short > 0) buttons.push({ label: `${t("g.takeLoan")} · ${fmt(short, fc)}`, value: "loan", primary: true });
-    if (E.ownedCells(m, p).length) buttons.push({ label: t("g.useAssets"), value: "assets" });
-    if (a.mandatory) buttons.push({ label: t("g.goBenefit"), value: "benefit" });
-    buttons.push({ label: t("g.back"), value: null });
-    const res = await dialog({ title: t("g.noFunds"), rows: o ? [[t("g.toPay"), fmt(o.amount, o.cur)], [t("g.available"), fmt(p.wallet.get(o.cur), o.cur)]] : [], buttons });
+    if (o && o.cur === fc && limit >= short && short > 0) buttons.push({ label: mt("noFunds", "loanButton", { sum: fmt(short, fc) }), value: "loan", primary: true });
+    if (E.ownedCells(m, p).length) buttons.push({ label: mt("noFunds", "assetsButton"), value: "assets" });
+    if (a.mandatory) buttons.push({ label: mt("noFunds", "benefitButton"), value: "benefit" });
+    buttons.push({ label: mt("noFunds", "backButton"), value: null });
+    const res = await dialog({ title: mt("noFunds", "title"), rows: o ? [[mt("noFunds", "rowToPay"), fmt(o.amount, o.cur)], [mt("noFunds", "rowAvailable"), fmt(p.wallet.get(o.cur), o.cur)]] : [], buttons });
     if (res === "loan" && E.takeLoan(m, p, Math.ceil(short))) E.perform(m, p, p.cell, a, o);
     if (res === "benefit") writeOff(p, o);
   };
@@ -660,10 +669,10 @@
       if (p.isBot) bid = nextBid <= Math.min(botLimit(p, base), p.wallet.get(cur)) ? nextBid : null;
       else {
         bid = await ask(p, {
-          title: `${t("g.auction")} · ${nm(id)}`, sub: `${t("g.bidder")}: ${p.name}`,
-          rows: [[t("g.start"), fmt(Math.round((base * E.SP.auctionStartPercent) / 100), cur)], [t("g.highest"), high.p ? `${fmt(high.amount, cur)} (${esc(high.p.name)})` : "—"], [t("game.balance"), fmt(p.wallet.get(cur), cur)]],
-          html: `<label class="dlg-input"><span>${t("g.amount")}</span><input type="number" id="bid-input" min="${nextBid}" step="10" value="${nextBid}" data-testid="auction-bid-input" /></label>`,
-          buttons: [{ label: t("g.bid"), primary: true, testid: "auction-bid-btn", value: { valueFrom: "#bid-input" } }, { label: t("g.pass"), value: null, testid: "auction-pass-btn" }],
+          title: mt("auction", "title", { cell: nm(id) }), sub: mt("auction", "description", { name: p.name }),
+          rows: [[mt("auction", "rowStart"), fmt(Math.round((base * E.SP.auctionStartPercent) / 100), cur)], [mt("auction", "rowHighest"), high.p ? `${fmt(high.amount, cur)} (${esc(high.p.name)})` : "—"], [mt("auction", "rowBalance"), fmt(p.wallet.get(cur), cur)]],
+          html: `<label class="dlg-input"><span>${mt("auction", "inputLabel")}</span><input type="number" id="bid-input" min="${nextBid}" step="10" value="${nextBid}" data-testid="auction-bid-input" /></label>`,
+          buttons: [{ label: mt("auction", "bidButton"), primary: true, testid: "auction-bid-btn", value: { valueFrom: "#bid-input" } }, { label: mt("auction", "passButton"), value: null, testid: "auction-pass-btn" }],
           closable: false,
         });
         if (bid != null && (bid < nextBid || !p.wallet.has(cur, bid))) bid = null;
@@ -681,7 +690,7 @@
     const unit = unitCur();
     if (a.id === "publicBuild") return { title: t("g.subjBuy"), rows: () => [[t("g.source"), t("g.bank")], [t("g.price"), fmt(E.price(m, id), unit)]] };
     const cost = E.buildCost(m, id, a.kind);
-    const kind = `${t("g.subjBuild")}: ${E.L(a.kind)}`;
+    const kind = t("tpl.subjBuild", { kind: E.L(a.kind) });
     if (a.id === "publicModule") return { title: kind, rows: () => [[t("g.source"), t("g.bank")], [t("g.price"), fmt(cost, unit)]] };
     const plan = E.sharedPlan(m, id, a.kind, m.current);
     return {
@@ -702,7 +711,7 @@
       let v;
       if (p === initiator) v = true;
       else if (p.isBot) v = subj.botYes ? subj.botYes(p) : p.botType === "narmonist" ? true : p.botType === "capitalist" ? Math.random() < 0.2 : Math.random() < 0.6;
-      else v = await ask(p, { title: `${t("g.vote")} · ${subj.title}`, sub: `${nm(id)} · ${t("g.voter")}: ${p.name}`, rows: [[t("g.initiator"), esc(initiator.name)], ...subj.rows(p), [t("g.weight"), `${Math.round((w / total) * 100)}%`]], buttons: [{ label: t("g.yes"), value: true, primary: true, testid: "vote-yes-btn" }, { label: t("g.no"), value: false, testid: "vote-no-btn" }], closable: false });
+      else v = await ask(p, { title: mt("vote", "title", { subject: subj.title }), sub: mt("vote", "description", { cell: nm(id), name: p.name }), rows: [[mt("vote", "rowInitiator"), esc(initiator.name)], ...subj.rows(p), [mt("vote", "rowWeight"), `${Math.round((w / total) * 100)}%`]], buttons: [{ label: mt("vote", "yesButton"), value: true, primary: true, testid: "vote-yes-btn" }, { label: mt("vote", "noButton"), value: false, testid: "vote-no-btn" }], closable: false });
       if (v) yes += w;
     }
     const ok = yes / total >= 0.5 - 1e-9; // 50 % «за» — решение принято
@@ -726,9 +735,9 @@
       // capitalist always takes the share; pro-people prefers letting the bank make it people's property
       if (q.isBot) cur = q.botType === "capitalist" || Math.random() < (q.botType === "narmonist" ? 0.3 : 0.5) ? opts[0].cur : null;
       else cur = await ask(q, {
-        title: t("g.shareOffer"), sub: `${nm(id)} · ${p.name}`,
-        rows: [[t("g.share"), `${Math.round(share * 100)}%`], [t("g.price"), fmt(price, unit)]],
-        buttons: [...opts.map((o) => ({ label: `${t("g.buyShare")} · ${fmt(o.amount, o.cur)}`, value: o.cur, primary: true, testid: `share-offer-buy-${o.cur}-btn` })), { label: t("g.no"), value: null, testid: "share-offer-decline-btn" }],
+        title: mt("shareOffer", "title"), sub: `${nm(id)} · ${p.name}`,
+        rows: [[mt("shareOffer", "rowShare"), `${Math.round(share * 100)}%`], [mt("shareOffer", "rowPrice"), fmt(price, unit)]],
+        buttons: [...opts.map((o) => ({ label: mt("shareOffer", "buyButton", { sum: fmt(o.amount, o.cur) }), value: o.cur, primary: true, testid: `share-offer-buy-${o.cur}-btn` })), { label: mt("shareOffer", "declineButton"), value: null, testid: "share-offer-decline-btn" }],
         closable: false,
       });
       if (cur) {
@@ -799,9 +808,9 @@
     const unit = unitCur();
     const curs = E.payOpts(m, offer.total);
     const res = await dialog({
-      title: `${t("g.buyShare")} ${Math.round(share * 100)}%`, sub: nm(id),
-      rows: [[t("g.price"), fmt(offer.total, unit)], ...offer.pays.map((v) => [`→ ${esc(v.pl.name)} (${Math.round(v.old * 100)}% → ${Math.round(v.next * 100)}%)`, fmt(v.amount, unit)])],
-      buttons: [...curs.map((o) => ({ label: `${t("g.pay." + o.cur)} · ${fmt(o.amount, o.cur)}`, value: o.cur, primary: true, disabled: !p.wallet.has(o.cur, o.amount), testid: `buy-share-pay-${o.cur}-btn` })), { label: t("g.back"), value: null, testid: "buy-share-cancel-btn" }],
+      title: mt("buyShare", "title", { pct: Math.round(share * 100) + "%" }), sub: nm(id),
+      rows: [[mt("buyShare", "rowPrice"), fmt(offer.total, unit)], ...offer.pays.map((v) => [`→ ${esc(v.pl.name)} (${Math.round(v.old * 100)}% → ${Math.round(v.next * 100)}%)`, fmt(v.amount, unit)])],
+      buttons: [...curs.map((o) => ({ label: mt("buyShare", "payButton", { cur: t("g.pay." + o.cur), sum: fmt(o.amount, o.cur) }), value: o.cur, primary: true, disabled: !p.wallet.has(o.cur, o.amount), testid: `buy-share-pay-${o.cur}-btn` })), { label: mt("buyShare", "backButton"), value: null, testid: "buy-share-cancel-btn" }],
     });
     if (!res) return;
     if (!E.buyShare(m, id, p, offer, res)) return window.MPApp.toast(t("g.noFunds"), "error");
@@ -839,16 +848,16 @@
     let chosen = others;
     if (!initiator.isBot) {
       chosen = await dialog({
-        title: t("g.joint"), sub: t("g.partners"),
+        title: mt("jointPartners", "title"), sub: mt("jointPartners", "description"),
         html: `<div class="dlg-checks">${others.map((p) => `<label><input type="checkbox" value="${p.id}" checked data-testid="joint-partner-${p.color}" /> ${esc(p.name)}</label>`).join("")}</div>`,
-        buttons: [{ label: t("g.confirm"), primary: true, testid: "joint-confirm-btn", value: () => $$(".dlg-checks input:checked").map((i) => m.player(i.value)) }, { label: t("g.back"), value: null }],
+        buttons: [{ label: mt("jointPartners", "confirmButton"), primary: true, testid: "joint-confirm-btn", value: () => $$(".dlg-checks input:checked").map((i) => m.player(i.value)) }, { label: mt("jointPartners", "backButton"), value: null }],
       });
       if (!chosen) return;
     }
     const partners = [initiator];
     const curs = {};
     // Pay buttons: "Участвовать 42 $" / "Участвовать 0,42 g"; a currency the player lacks is disabled
-    const payBtns = (p, part, tid) => E.jointOpts(m, part).map((o) => ({ label: `${t("g.join")} ${fmt(o.amount, o.cur)}`, value: o.cur, primary: o.cur === "usd", disabled: !p.wallet.has(o.cur, o.amount), testid: `${tid}-${o.cur}-btn` }));
+    const payBtns = (p, part, tid) => E.jointOpts(m, part).map((o) => ({ label: mt("jointParticipate", "joinButton", { sum: fmt(o.amount, o.cur) }), value: o.cur, primary: o.cur === "usd", disabled: !p.wallet.has(o.cur, o.amount), testid: `${tid}-${o.cur}-btn` }));
     const botCur = (p, part) => {
       const opts = E.jointOpts(m, part).filter((o) => p.wallet.has(o.cur, o.amount));
       return (opts.find((o) => o.cur === (p.botType === "narmonist" ? "nar" : "usd")) || opts[0] || {}).cur;
@@ -858,13 +867,13 @@
       const can = E.canPayAny(p, E.jointOpts(m, part));
       let cur = null;
       if (p.isBot) cur = can && p.botType !== "capitalist" ? botCur(p, part) : null;
-      else if (can) cur = await ask(p, { title: t("g.joint"), sub: `${nm(id)} · ${p.name}`, rows: [[t("g.part"), E.jointOpts(m, part).map((o) => fmt(o.amount, o.cur)).join(" / ")]], buttons: [...payBtns(p, part, "joint-join"), { label: t("g.pass"), value: null, testid: "joint-pass-btn" }], closable: false });
+      else if (can) cur = await ask(p, { title: mt("jointParticipate", "title"), sub: `${nm(id)} · ${p.name}`, rows: [[mt("jointParticipate", "rowPart"), E.jointOpts(m, part).map((o) => fmt(o.amount, o.cur)).join(" / ")]], buttons: [...payBtns(p, part, "joint-join"), { label: mt("jointParticipate", "declineButton"), value: null, testid: "joint-pass-btn" }], closable: false });
       if (cur) (partners.push(p), (curs[p.id] = cur));
     }
     const own = Math.round(E.price(m, id) / partners.length);
     if (initiator.isBot) curs[initiator.id] = botCur(initiator, own);
     else {
-      curs[initiator.id] = await ask(initiator, { title: t("g.joint"), sub: `${nm(id)} · ${initiator.name}`, rows: [[t("g.part"), E.jointOpts(m, own).map((o) => fmt(o.amount, o.cur)).join(" / ")]], buttons: [...payBtns(initiator, own, "joint-own"), { label: t("g.back"), value: null, testid: "joint-own-cancel-btn" }], closable: false });
+      curs[initiator.id] = await ask(initiator, { title: mt("jointParticipate", "title"), sub: `${nm(id)} · ${initiator.name}`, rows: [[mt("jointParticipate", "rowPart"), E.jointOpts(m, own).map((o) => fmt(o.amount, o.cur)).join(" / ")]], buttons: [...payBtns(initiator, own, "joint-own"), { label: mt("jointParticipate", "backButton"), value: null, testid: "joint-own-cancel-btn" }], closable: false });
       if (!curs[initiator.id]) return;
     }
     E.jointBuy(m, id, partners, curs);
@@ -875,18 +884,18 @@
   const handleFlow = async (flow, p) => {
     if (flow === "anomaly") {
       // modal → it closes → dice animation → pause on the result
-      const rollDice = async (sub, testid) => {
-        if (!p.isBot) await dialog({ title: nm("c30"), sub, buttons: [{ label: t("game.roll"), value: true, primary: true, testid }], closable: false });
+      const rollDice = async (modal, testid) => {
+        if (!p.isBot) await dialog({ title: mt(modal, "title", { cell: nm("c30") }), sub: mt(modal, "description"), buttons: [{ label: mt(modal, "button"), value: true, primary: true, testid }], closable: false });
         const r = await rollAnim();
         if (m.lastRoll) diceKey = `${m.id}:${m.turnNo}:${m.lastRoll.a}:${m.lastRoll.b}`; // keep showing the anomaly dice
         await wait(HOLD_MS);
         return r;
       };
-      const [a, b] = await rollDice(t("g.anomaly"), "anomaly-roll-btn");
+      const [a, b] = await rollDice("anomaly", "anomaly-roll-btn");
       m.log({ key: "h.anomaly", playerId: p.id, params: { a, b, sum: a + b } });
       let res = B.resolveAnomalyTeleport(a + b);
       if (res.needsExtra) {
-        const [x, y] = await rollDice(t("g.anomalyExtra"), "anomaly-extra-roll-btn");
+        const [x, y] = await rollDice("anomalyReroll", "anomaly-extra-roll-btn");
         m.log({ key: "h.anomalyExtra", playerId: p.id, params: { a: x, b: y, sum: x + y } });
         res = B.resolveAnomalyTeleport(2, x + y);
       }
@@ -904,12 +913,12 @@
     m.log({ key: "h.card", playerId: p.id, params: { deck: `@c.${kind}`, n: d.n, text: sum } });
     const html = `<div class="mp-card mp-card--${kind}" data-testid="card-view"><span class="mp-card-kind">${kind.toUpperCase()} · ${E.L("m_" + d.model)}</span>
       <p class="mp-card-text" data-testid="card-text">${esc(window.MPCards.text(m, d))}</p><p class="mp-card-effect" data-testid="card-effect">${esc(sum)}</p></div>`;
-    const title = `${t("c." + kind)} №${d.n}`;
+    const title = mt("card", "title", { deck: t("c." + kind), n: d.n });
     let choice = null;
     if (d.card.actionType === "choice") {
       choice = p.isBot ? (p.wallet.get(E.fiatCur(m)) > 100 ? "fine" : "chance")
-        : await dialog({ title, html, buttons: [{ label: t("c.payFine"), value: "fine", primary: true, testid: "card-fine-btn" }, { label: t("c.drawChance"), value: "chance", testid: "card-chance-btn" }], closable: false });
-    } else if (!p.isBot) await dialog({ title, html, buttons: [{ label: t("c.apply"), value: true, primary: true, testid: "card-apply-btn" }], closable: false });
+        : await dialog({ title, html, buttons: [{ label: mt("card", "fineButton"), value: "fine", primary: true, testid: "card-fine-btn" }, { label: mt("card", "chanceButton"), value: "chance", testid: "card-chance-btn" }], closable: false });
+    } else if (!p.isBot) await dialog({ title, html, buttons: [{ label: mt("card", "applyButton"), value: true, primary: true, testid: "card-apply-btn" }], closable: false });
     const r = window.MPCards.apply(m, p, d, choice) || {};
     m.changed();
     if (r.chance) return cardFlow(p, "chance");
@@ -939,16 +948,16 @@
       if (st) st.textContent = t("ad.done");
     }, 5000);
     const ok = await dialog({
-      title: t("ad.title"), sub: `${p.name} · ${t("ad.reward")}: ${fmt(amount, cur)}`,
-      html: `<div class="ad-box" data-testid="ad-player"><span class="ad-tag">AD · MOCK</span><p id="ad-state">${t("ad.watching")}</p><div class="ad-track"><i id="ad-bar"></i></div></div>`,
-      buttons: [{ label: t("ad.claim"), value: true, primary: true, disabled: true, testid: "ad-claim-btn" }, { label: t("g.back"), value: null, testid: "ad-cancel-btn" }],
+      title: mt("adBonus", "title"), sub: mt("adBonus", "description", { name: p.name, sum: fmt(amount, cur) }),
+      html: `<div class="ad-box" data-testid="ad-player"><span class="ad-tag">AD · MOCK</span><p id="ad-state">${mt("adBonus", "watching")}</p><div class="ad-track"><i id="ad-bar"></i></div></div>`,
+      buttons: [{ label: mt("adBonus", "claimButton"), value: true, primary: true, disabled: true, testid: "ad-claim-btn" }, { label: mt("adBonus", "cancelButton"), value: null, testid: "ad-cancel-btn" }],
     });
     clearTimeout(timer);
     if (!ok) return window.MPApp.toast(t("ad.cancel"), "error");
     m.flags.ads[p.id] = m.roundNo;
     m.credit(p, cur, amount, "h.adBonus");
     m.changed();
-    await dialog({ title: t("ad.ok"), rows: [[t("g.amount"), fmt(amount, cur)], [t("ad.cur"), t("cur." + cur)], [t("ad.after"), fmt(p.wallet.get(cur), cur)]], buttons: [{ label: t("common.close"), value: true, primary: true, testid: "ad-close-btn" }] });
+    await dialog({ title: mt("adBonusDone", "title"), rows: [[mt("adBonusDone", "rowAmount"), fmt(amount, cur)], [mt("adBonusDone", "rowCurrency"), t("cur." + cur)], [mt("adBonusDone", "rowAfter"), fmt(p.wallet.get(cur), cur)]], buttons: [{ label: mt("adBonusDone", "closeButton"), value: true, primary: true, testid: "ad-close-btn" }] });
   };
 
   /* ================= Results ================= */
@@ -974,7 +983,7 @@
     return { unit, rows: rows.sort((a, b) => b.points - a.points), draw: rows.filter((r) => r.winner).length > 1 };
   };
   const finishGame = async () => {
-    const ok = await dialog({ title: t("r.confirmTitle"), sub: t("r.confirmSub"), buttons: [{ label: t("r.finish"), value: true, primary: true, testid: "confirm-finish-btn" }, { label: t("g.back"), value: null }] });
+    const ok = await dialog({ title: mt("finishGame", "title"), sub: mt("finishGame", "description"), buttons: [{ label: mt("finishGame", "finishButton"), value: true, primary: true, testid: "confirm-finish-btn" }, { label: mt("finishGame", "backButton"), value: null }] });
     if (!ok) return;
     const res = computeResults();
     m.log({ key: "h.finished", params: { names: res.rows.filter((r) => r.winner).map((r) => r.p.name).join(", ") } });
@@ -1028,11 +1037,11 @@
     const gold = m.bank.goldPrice;
     const max = Math.floor(p.wallet.usd);
     const amount = await dialog({
-      title: t("g.exchange"), sub: p.name,
-      rows: [[t("g.rate"), `1 g = ${fmt(gold, "usd")}`], [t("game.balance"), `${fmt(p.wallet.usd, "usd")} · ${fmt(p.wallet.nar, "nar")}`]],
-      html: `<label class="dlg-input"><span>${t("g.amount")}, $</span><input type="number" id="ex-input" min="1" max="${max}" step="10" value="${Math.min(max, Math.round(gold))}" data-testid="exchange-amount-input" /></label>
-        <p class="ex-preview" data-testid="exchange-preview">${t("g.youGet")}: <b id="ex-out">${fmt(m.bank.usdToNar(Math.min(max, Math.round(gold))), "nar")}</b></p>`,
-      buttons: [{ label: t("g.exchangeDo"), primary: true, value: () => +$("#ex-input").value, testid: "exchange-confirm-btn" }, { label: t("g.back"), value: null, testid: "exchange-cancel-btn" }],
+      title: mt("exchange", "title"), sub: p.name,
+      rows: [[mt("exchange", "rowRate"), `1 g = ${fmt(gold, "usd")}`], [mt("exchange", "rowBalance"), `${fmt(p.wallet.usd, "usd")} · ${fmt(p.wallet.nar, "nar")}`]],
+      html: `<label class="dlg-input"><span>${mt("exchange", "inputLabel")}</span><input type="number" id="ex-input" min="1" max="${max}" step="10" value="${Math.min(max, Math.round(gold))}" data-testid="exchange-amount-input" /></label>
+        <p class="ex-preview" data-testid="exchange-preview">${mt("exchange", "youGet")} <b id="ex-out">${fmt(m.bank.usdToNar(Math.min(max, Math.round(gold))), "nar")}</b></p>`,
+      buttons: [{ label: mt("exchange", "exchangeButton"), primary: true, value: () => +$("#ex-input").value, testid: "exchange-confirm-btn" }, { label: mt("exchange", "backButton"), value: null, testid: "exchange-cancel-btn" }],
     });
     if (!amount) return;
     if (amount <= 0 || !p.wallet.has("usd", amount)) return window.MPApp.toast(t("g.noFunds"), "error");
@@ -1067,12 +1076,12 @@
       if (p.isBot) pick = loan ? "loan" : builds.length ? "b:" + builds[0] : morts.length ? "m:" + morts[0] : "bankrupt";
       else {
         pick = await dialog({
-          title: t("g.interestTitle"), sub: t("g.interestSub", { rate: m.macro.creditRate }),
-          rows: [[t("g.toPay"), fmt(due, fc)], [t("g.missing"), fmt(short, fc)], [t("game.balance"), fmt(p.wallet.get(fc), fc)]],
-          buttons: [...(loan ? [{ label: `${t("g.takeLoan")} · ${fmt(loan, fc)}`, value: "loan", primary: true, testid: "interest-loan-btn" }] : []),
-            ...builds.map((id) => ({ label: `${t(m.cells[id].dome ? "g.sellDome" : "g.sellModule")}: ${nm(id)} · +${fmt(E.buildingRefund(m, id), fc)}`, value: "b:" + id, testid: `interest-sell-${id}-btn` })),
-            ...morts.map((id) => ({ label: `${t("g.mortgageBtn")}: ${nm(id)} · +${fmt(E.mortgageValue(m, id), fc)}`, value: "m:" + id, testid: `interest-mortgage-${id}-btn` })),
-            { label: t("g.declareBankrupt"), value: "bankrupt", testid: "interest-bankrupt-btn" }],
+          title: mt("loanInterest", "title"), sub: mt("loanInterest", "description", { rate: m.macro.creditRate }),
+          rows: [[mt("loanInterest", "rowToPay"), fmt(due, fc)], [mt("loanInterest", "rowMissing"), fmt(short, fc)], [mt("loanInterest", "rowBalance"), fmt(p.wallet.get(fc), fc)]],
+          buttons: [...(loan ? [{ label: mt("loanInterest", "loanButton", { sum: fmt(loan, fc) }), value: "loan", primary: true, testid: "interest-loan-btn" }] : []),
+            ...builds.map((id) => ({ label: mt("loanInterest", m.cells[id].dome ? "sellDomeButton" : "sellModuleButton", { cell: nm(id), sum: fmt(E.buildingRefund(m, id), fc) }), value: "b:" + id, testid: `interest-sell-${id}-btn` })),
+            ...morts.map((id) => ({ label: mt("loanInterest", "mortgageButton", { cell: nm(id), sum: fmt(E.mortgageValue(m, id), fc) }), value: "m:" + id, testid: `interest-mortgage-${id}-btn` })),
+            { label: mt("loanInterest", "bankruptButton"), value: "bankrupt", testid: "interest-bankrupt-btn" }],
           closable: false,
         });
       }
@@ -1097,7 +1106,7 @@
     const nar = m.scenario === "nar_nar";
     const opt = nar ? { cur: "nar", amount: E.SP.blackHoleFineNar } : { cur: E.fiatCur(m), amount: m.bank.fiat(E.SP.blackHoleFine) };
     const can = p.wallet.has(opt.cur, opt.amount);
-    const choice = p.isBot ? (can ? "pay" : "skip") : await dialog({ title: "Black Hole", sub: t("g.bh"), buttons: [{ label: `${t("g.payFine")} · ${fmt(opt.amount, opt.cur)}`, value: "pay", disabled: !can, primary: true, testid: "bh-pay-btn" }, { label: t("g.skip"), value: "skip", testid: "bh-skip-btn" }], closable: false });
+    const choice = p.isBot ? (can ? "pay" : "skip") : await dialog({ title: mt("blackHole", "title"), sub: mt("blackHole", "description"), buttons: [{ label: mt("blackHole", "payButton", { sum: fmt(opt.amount, opt.cur) }), value: "pay", disabled: !can, primary: true, testid: "bh-pay-btn" }, { label: mt("blackHole", "skipButton"), value: "skip", testid: "bh-skip-btn" }], closable: false });
     p.restrictions.blackhole = false;
     if (choice === "pay") {
       m.debit(p, opt.cur, opt.amount, "h.bhFine");
@@ -1283,11 +1292,11 @@
       if (id && !s) return;
       if (pr.dataset.prop === "mortgage" && !E.mortgage(m, p, id)) window.MPApp.toast(t("g.noFunds"), "error");
       if (pr.dataset.prop === "sell" && E.model(m, id) === "nar") {
-        const ok = await dialog({ title: t("g.sellShare"), sub: nm(id), rows: [[t("g.share"), `${Math.round(s.owners[p.id] * 100)}%`], [t("g.price"), fmt(E.holdingValue(m, id, p), unitCur())]], html: `<p class="dlg-sub">${t("g.sellShareHint")}</p>`, buttons: [{ label: t("g.sellShare"), value: true, primary: true, testid: "sell-share-confirm-btn" }, { label: t("g.back"), value: null }] });
+        const ok = await dialog({ title: mt("sellShare", "title"), sub: nm(id), rows: [[mt("sellShare", "rowShare"), `${Math.round(s.owners[p.id] * 100)}%`], [mt("sellShare", "rowPrice"), fmt(E.holdingValue(m, id, p), unitCur())]], html: `<p class="dlg-sub">${mt("sellShare", "description")}</p>`, buttons: [{ label: mt("sellShare", "confirmButton"), value: true, primary: true, testid: "sell-share-confirm-btn" }, { label: mt("sellShare", "backButton"), value: null }] });
         if (!ok) return;
         await sellShareFlow(p, id);
       } else if (pr.dataset.prop === "sell") {
-        const ok = await dialog({ title: t("g.sellConfirm"), sub: nm(id), rows: [[t("g.youGet"), fmt(E.sellPrice(m, id), E.fiatCur(m))]], buttons: [{ label: t("g.sellBank"), value: true, primary: true, testid: "sell-confirm-btn" }, { label: t("g.back"), value: null }] });
+        const ok = await dialog({ title: mt("sellToBank", "title"), sub: nm(id), rows: [[mt("sellToBank", "rowYouGet"), fmt(E.sellPrice(m, id), E.fiatCur(m))]], buttons: [{ label: mt("sellToBank", "sellButton"), value: true, primary: true, testid: "sell-confirm-btn" }, { label: mt("sellToBank", "backButton"), value: null }] });
         if (!ok) return;
         E.sellToBank(m, p, id);
       }
@@ -1296,7 +1305,7 @@
       if (pr.dataset.prop === "repay" && !E.repayLoans(m, p)) window.MPApp.toast(t("g.noFunds"), "error");
       if (pr.dataset.prop === "loan") {
         const fc = E.fiatCur(m);
-        const amt = await dialog({ title: t("g.loan"), rows: [[t("g.limit"), fmt(E.loanLimit(m, p), fc)]], html: `<label class="dlg-input"><span>${t("g.amount")}</span><input type="number" id="loan-input" min="10" step="10" value="${Math.min(500, Math.floor(E.loanLimit(m, p)))}" data-testid="loan-amount-input" /></label>`, buttons: [{ label: t("g.takeLoan"), primary: true, value: () => +$("#loan-input").value, testid: "loan-confirm-btn" }, { label: t("g.back"), value: null }] });
+        const amt = await dialog({ title: mt("loan", "title"), rows: [[mt("loan", "rowLimit"), fmt(E.loanLimit(m, p), fc)]], html: `<label class="dlg-input"><span>${mt("loan", "inputLabel")}</span><input type="number" id="loan-input" min="10" step="10" value="${Math.min(500, Math.floor(E.loanLimit(m, p)))}" data-testid="loan-amount-input" /></label>`, buttons: [{ label: mt("loan", "takeButton"), primary: true, value: () => +$("#loan-input").value, testid: "loan-confirm-btn" }, { label: mt("loan", "backButton"), value: null }] });
         if (amt && !E.takeLoan(m, p, amt)) window.MPApp.toast(t("g.noFunds"), "error");
       }
       m.changed();

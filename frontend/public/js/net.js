@@ -279,7 +279,7 @@
     $("#lobby-link").value = link();
     $("#lobby-seats").innerHTML = room.seats.map((s) => `<li class="draw-item${s.idx === session.seat ? " is-current" : ""}" data-testid="lobby-seat-${s.idx}">
       <span class="p-dot c-${s.color}"></span>${esc(s.isBot ? t(`color.${s.color}`) : s.name || t("net.waiting"))}
-      <span class="draw-res">${s.isBot ? `${t("net.bot")} · ${t(`bot.${s.botType}`)}` : s.joined ? (s.idx === 0 ? t("net.host") : "") + (s.idx === session.seat ? ` (${t("net.you")})` : "") : t("net.free")}</span></li>`).join("");
+      <span class="draw-res">${s.isBot ? t("tpl.bot", { type: t(`bot.${s.botType}`) }) : s.joined ? (s.idx === 0 ? t("net.host") : "") + (s.idx === session.seat ? ` (${t("net.you")})` : "") : t("net.free")}</span></li>`).join("");
     $("#btn-lobby-start").hidden = !host;
     $("#btn-lobby-start").disabled = room.seats.some((s) => !s.joined);
   };

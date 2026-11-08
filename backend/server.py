@@ -12,7 +12,7 @@ import secrets
 import string
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Literal, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional
 
 import bcrypt
 import jwt
@@ -176,6 +176,7 @@ class ContentConfigIn(BaseModel):
     defaultCreditRate: float = Field(default=2, ge=0, le=10)
     fields: List[FieldCfg] = Field(min_length=1, max_length=100)
     cards: Dict[str, List[CardCfg]]
+    systemModalsText: Dict[str, Dict[Literal["RU", "EN", "UA"], Dict[str, Annotated[str, Field(max_length=600)]]]] = {}
 
 
 @api.get("/content-config")

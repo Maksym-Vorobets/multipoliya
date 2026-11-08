@@ -1,0 +1,256 @@
+{
+ "fields": {
+  "rentShortage": {
+   "title": "{t:g.noFunds}",
+   "description": "{t:g.sellToPay}",
+   "rowToPay": "{t:g.toPay}",
+   "rowMissing": "{t:g.missing}",
+   "rowBalance": "{t:game.balance}",
+   "loanButton": "{t:g.takeLoan} · {sum}",
+   "sellButton": "{t:g.sellBank}: {cell} · +{sum}"
+  },
+  "noFunds": {
+   "loanButton": "{t:g.takeLoan} · {sum}",
+   "assetsButton": "{t:g.useAssets}",
+   "benefitButton": "{t:g.goBenefit}",
+   "backButton": "{t:g.back}",
+   "title": "{t:g.noFunds}",
+   "rowToPay": "{t:g.toPay}",
+   "rowAvailable": "{t:g.available}"
+  },
+  "auction": {
+   "title": "{t:g.auction} · {cell}",
+   "description": "{t:g.bidder}: {name}",
+   "rowStart": "{t:g.start}",
+   "rowHighest": "{t:g.highest}",
+   "rowBalance": "{t:game.balance}",
+   "inputLabel": "{t:g.amount}",
+   "bidButton": "{t:g.bid}",
+   "passButton": "{t:g.pass}"
+  },
+  "vote": {
+   "title": "{t:g.vote} · {subject}",
+   "description": "{cell} · {t:g.voter}: {name}",
+   "rowInitiator": "{t:g.initiator}",
+   "rowWeight": "{t:g.weight}",
+   "yesButton": "{t:g.yes}",
+   "noButton": "{t:g.no}"
+  },
+  "shareOffer": {
+   "title": "{t:g.shareOffer}",
+   "rowShare": "{t:g.share}",
+   "rowPrice": "{t:g.price}",
+   "buyButton": "{t:g.buyShare} · {sum}",
+   "declineButton": "{t:g.no}"
+  },
+  "buyShare": {
+   "title": "{t:g.buyShare} {pct}",
+   "rowPrice": "{t:g.price}",
+   "payButton": "{cur} · {sum}",
+   "backButton": "{t:g.back}"
+  },
+  "jointPartners": {
+   "title": "{t:g.joint}",
+   "description": "{t:g.partners}",
+   "confirmButton": "{t:g.confirm}",
+   "backButton": "{t:g.back}"
+  },
+  "jointParticipate": {
+   "joinButton": "{t:g.join} {sum}",
+   "title": "{t:g.joint}",
+   "rowPart": "{t:g.part}",
+   "declineButton": "{t:g.pass}",
+   "backButton": "{t:g.back}"
+  },
+  "anomaly": {
+   "title": "{cell}",
+   "button": "{t:game.roll}",
+   "description": "{t:g.anomaly}"
+  },
+  "anomalyReroll": {
+   "title": {
+    "RU": "Дубль 1:1",
+    "EN": "Double 1:1",
+    "UA": "Дубль 1:1"
+   },
+   "description": "{t:g.anomalyExtra}",
+   "button": "{t:game.roll}"
+  },
+  "card": {
+   "title": "{deck} №{n}",
+   "fineButton": "{t:c.payFine}",
+   "chanceButton": "{t:c.drawChance}",
+   "applyButton": "{t:c.apply}"
+  },
+  "adBonus": {
+   "title": "{t:ad.title}",
+   "description": "{name} · {t:ad.reward}: {sum}",
+   "watching": "{t:ad.watching}",
+   "claimButton": "{t:ad.claim}",
+   "cancelButton": "{t:g.back}"
+  },
+  "adBonusDone": {
+   "title": "{t:ad.ok}",
+   "rowAmount": "{t:g.amount}",
+   "rowCurrency": "{t:ad.cur}",
+   "rowAfter": "{t:ad.after}",
+   "closeButton": "{t:common.close}"
+  },
+  "finishGame": {
+   "title": "{t:r.confirmTitle}",
+   "description": "{t:r.confirmSub}",
+   "finishButton": "{t:r.finish}",
+   "backButton": "{t:g.back}"
+  },
+  "exchange": {
+   "title": "{t:g.exchange}",
+   "rowRate": "{t:g.rate}",
+   "rowBalance": "{t:game.balance}",
+   "inputLabel": "{t:g.amount}, $",
+   "youGet": "{t:g.youGet}:",
+   "exchangeButton": "{t:g.exchangeDo}",
+   "backButton": "{t:g.back}"
+  },
+  "blackHole": {
+   "title": "Black Hole",
+   "description": "{t:g.bh}",
+   "payButton": "{t:g.payFine} · {sum}",
+   "skipButton": "{t:g.skip}"
+  },
+  "loanInterest": {
+   "title": "{t:g.interestTitle}",
+   "description": "{t:g.interestSub}",
+   "rowToPay": "{t:g.toPay}",
+   "rowMissing": "{t:g.missing}",
+   "rowBalance": "{t:game.balance}",
+   "loanButton": "{t:g.takeLoan} · {sum}",
+   "sellModuleButton": "{t:g.sellModule}: {cell} · +{sum}",
+   "sellDomeButton": "{t:g.sellDome}: {cell} · +{sum}",
+   "mortgageButton": "{t:g.mortgageBtn}: {cell} · +{sum}",
+   "bankruptButton": "{t:g.declareBankrupt}"
+  },
+  "sellShare": {
+   "title": "{t:g.sellShare}",
+   "rowShare": "{t:g.share}",
+   "rowPrice": "{t:g.price}",
+   "description": "{t:g.sellShareHint}",
+   "confirmButton": "{t:g.sellShare}",
+   "backButton": "{t:g.back}"
+  },
+  "sellToBank": {
+   "title": "{t:g.sellConfirm}",
+   "rowYouGet": "{t:g.youGet}",
+   "sellButton": "{t:g.sellBank}",
+   "backButton": "{t:g.back}"
+  },
+  "loan": {
+   "title": "{t:g.loan}",
+   "rowLimit": "{t:g.limit}",
+   "inputLabel": "{t:g.amount}",
+   "takeButton": "{t:g.takeLoan}",
+   "backButton": "{t:g.back}"
+  }
+ },
+ "labels": {
+  "rentShortage": [
+   "Нехватка средств на аренду",
+   "Not enough money for rent",
+   "Нестача коштів на оренду"
+  ],
+  "noFunds": [
+   "Недостаточно средств",
+   "Not enough money",
+   "Недостатньо коштів"
+  ],
+  "auction": [
+   "Аукцион",
+   "Auction",
+   "Аукціон"
+  ],
+  "vote": [
+   "Голосование",
+   "Vote",
+   "Голосування"
+  ],
+  "shareOffer": [
+   "Предложение доли совладельцам",
+   "Share offer to co-owners",
+   "Пропозиція частки співвласникам"
+  ],
+  "buyShare": [
+   "Покупка доли",
+   "Buy a share",
+   "Купівля частки"
+  ],
+  "jointPartners": [
+   "Совместная покупка: выбор партнёров",
+   "Joint purchase: partners",
+   "Спільна купівля: вибір партнерів"
+  ],
+  "jointParticipate": [
+   "Совместная покупка: участие",
+   "Joint purchase: participation",
+   "Спільна купівля: участь"
+  ],
+  "anomaly": [
+   "Аномалия вероятности",
+   "Anomaly of Probability",
+   "Аномалія ймовірності"
+  ],
+  "anomalyReroll": [
+   "Аномалия: проверочный бросок (дубль 1:1)",
+   "Anomaly: check roll (double 1:1)",
+   "Аномалія: перевірочний кидок (дубль 1:1)"
+  ],
+  "card": [
+   "Карточка Шанс / Борги",
+   "Chance / Borgi card",
+   "Картка Шанс / Борги"
+  ],
+  "adBonus": [
+   "Реклама: бонус",
+   "Ad bonus",
+   "Реклама: бонус"
+  ],
+  "adBonusDone": [
+   "Реклама: бонус получен",
+   "Ad bonus received",
+   "Реклама: бонус отримано"
+  ],
+  "finishGame": [
+   "Завершение партии",
+   "Finish the game",
+   "Завершення партії"
+  ],
+  "exchange": [
+   "Обмен $ на нармонит",
+   "Exchange $ for Narmonit",
+   "Обмін $ на нармоніт"
+  ],
+  "blackHole": [
+   "Black Hole: штраф или пропуск хода",
+   "Black Hole: fine or skip",
+   "Black Hole: штраф або пропуск ходу"
+  ],
+  "loanInterest": [
+   "Проценты по кредиту",
+   "Loan interest",
+   "Відсотки за кредитом"
+  ],
+  "sellShare": [
+   "Продажа доли",
+   "Sell a share",
+   "Продаж частки"
+  ],
+  "sellToBank": [
+   "Продажа банку",
+   "Sell to the bank",
+   "Продаж банку"
+  ],
+  "loan": [
+   "Кредит",
+   "Loan",
+   "Кредит"
+  ]
+ }
+}

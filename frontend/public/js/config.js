@@ -30,6 +30,9 @@
       defaultInflationRate: rate("defaultInflationRate"),
       defaultCreditRate: rate("defaultCreditRate"),
       fields: base.fields.map((f) => (byId[f.id] ? { ...f, ...byId[f.id], type: f.type, name: { ...f.name, ...(byId[f.id].name || {}) } } : f)),
+      // modal texts: per modal / language / field over defaults
+      systemModalsText: Object.fromEntries(Object.entries(base.systemModalsText).map(([k, langs]) => [k, Object.fromEntries(Object.entries(langs).map(([L, f]) =>
+        [L, { ...f, ...Object.fromEntries(Object.entries(((c.systemModalsText || {})[k] || {})[L] || {}).filter(([fk, v]) => fk in f && typeof v === "string" && v.trim())) }]))])),
       cards: Object.fromEntries(Object.entries(base.cards).map(([d, l]) => [d, Array.isArray(c.cards && c.cards[d]) && c.cards[d].length ? c.cards[d] : l])),
     };
   };
